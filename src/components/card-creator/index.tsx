@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CardData } from "./types";
 import CardForm from "./CardForm";
 import CardPreview from "./CardPreview";
@@ -13,6 +13,25 @@ export default function CardCreator() {
     image: "",
     type: "Normal",
   });
+
+  // Save card to local storage when it's complete
+  useEffect(() => {
+    if (cardData.name && cardData.image && cardData.type) {
+      const cards = JSON.parse(localStorage.getItem("pokemon-cards") || "[]");
+      const cardExists = cards.some(
+        (card) =>
+          card.name === cardData.name &&
+          card.image === cardData.image &&
+          card.type === cardData.type,
+      );
+      if (!cardExists) {
+        localStorage.setItem(
+          "pokemon-cards",
+          JSON.stringify([...cards, cardData]),
+        );
+      }
+    }
+  }, [cardData]);
 
   const [showPreview, setShowPreview] = useState(false);
 
