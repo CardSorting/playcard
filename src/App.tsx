@@ -7,6 +7,8 @@ import { Nav } from "@/components/ui/nav";
 // Lazy load components
 const Home = lazy(() => import("./components/home"));
 const CardCreator = lazy(() => import("./components/card-creator"));
+const Cart = lazy(() => import("./components/marketplace/cart"));
+const Checkout = lazy(() => import("./components/marketplace/checkout"));
 const Collection = lazy(() => import("./components/collection"));
 const BoosterPacks = lazy(() => import("./components/booster-packs"));
 const MarketplaceLayout = lazy(() => import("./components/marketplace/layout"));
@@ -53,6 +55,8 @@ function App() {
           <Route path="/create" element={<CardCreator />} />
           <Route path="/collection" element={<Collection />} />
           <Route path="/packs" element={<BoosterPacks />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/checkout" element={<Checkout />} />
           <Route path="/marketplace" element={<MarketplaceLayout />}>
             <Route index element={<Marketplace />} />
             <Route path="seller" element={<SellerDashboard />} />
