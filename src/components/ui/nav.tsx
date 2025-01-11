@@ -7,6 +7,7 @@ import {
   Library,
   PackageIcon,
   Store,
+  ImageIcon,
   ShoppingCart,
 } from "lucide-react";
 
@@ -30,6 +31,11 @@ export function Nav() {
       to: "/packs",
       icon: <PackageIcon className="w-5 h-5" />,
       label: "Booster Packs",
+    },
+    {
+      to: "/generate",
+      icon: <ImageIcon className="w-5 h-5" />,
+      label: "Generate Art",
     },
     {
       to: "/marketplace",
