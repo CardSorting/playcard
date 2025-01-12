@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/contexts/auth-context';
 import { useEffect } from 'react';
 import { initializeFirestore } from './lib/initFirestore';
@@ -51,8 +51,7 @@ function App() {
   return (
     <AuthProvider>
       <FirebaseInitializer>
-        <Router>
-          <Routes>
+        <Routes>
             <Route path="/" element={
               <ProtectedRoute>
                 <Home />
@@ -83,9 +82,8 @@ function App() {
                 <Claims />
               </ProtectedRoute>
             } />
-          </Routes>
-          <Toaster />
-        </Router>
+        </Routes>
+        <Toaster />
       </FirebaseInitializer>
     </AuthProvider>
   );
