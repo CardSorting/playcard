@@ -510,7 +510,11 @@ match /collaborationInvites/{inviteId} {
           isDefaultCollection(resource.data.collectionId)
         )
       );
-      allow write: if false; // Only through functions
+      allow create: if isAuthenticated() && (
+        isCollectionOwner(request.resource.data.collectionId) ||
+        isDefaultCollection(request.resource.data.collectionId)
+      );
+      allow update, delete: if false; // Only through functions
     }
     match /collectionSharing/{sharingId} {
       allow read: if isAuthenticated() && (
@@ -583,11 +587,16 @@ match /collaborationInvites/{inviteId} {
           isDefaultCollection(resource.data.collectionId)
         )
       );
-      allow write: if isAuthenticated() && (
+      allow create: if isAuthenticated() && (
+        isCollectionOwner(request.resource.data.collectionId) ||
+        isDefaultCollection(request.resource.data.collectionId)
+      );
+      allow update: if isAuthenticated() && (
         isCollectionOwner(resource.data.collectionId) ||
         hasCollectionEditAccess(resource.data.collectionId) ||
         isDefaultCollection(resource.data.collectionId)
       );
+      allow delete: if false;
     }
 
     // booster-packs rules
