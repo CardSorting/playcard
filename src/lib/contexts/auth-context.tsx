@@ -10,7 +10,24 @@ interface AuthContextType {
   loading: boolean;
 }
 
+const AUTH_STORAGE_KEY = 'firebaseAuthState';
+
 const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
+
+// Helper function to persist auth state
+const persistAuthState = (user: User | null) => {
+  if (user) {
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
+  } else {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+  }
+};
+
+// Helper function to get persisted auth state
+const getPersistedAuthState = (): User | null => {
+  const user = localStorage.getItem(AUTH_STORAGE_KEY);
+  return user ? JSON.parse(user) : null;
+};
 
 export const useAuth = () => useContext(AuthContext);
 
@@ -60,11 +77,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Handle redirect result first
+    // Check for persisted auth state first
+    const persistedUser = getPersistedAuthState();
+    if (persistedUser) {
+      setUser(persistedUser);
+      setLoading(false);
+    }
+
+    // Handle redirect result
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
           await initializeUserData(result.user);
+          persistAuthState(result.user);
           setUser(result.user);
           navigate('/');
         }
@@ -79,6 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         await initializeUserData(user);
+        persistAuthState(user);
+      } else {
+        persistAuthState(null);
       }
       setUser(user);
       setLoading(false);

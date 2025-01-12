@@ -47,6 +47,24 @@
       ]
     },
     {
+      "collectionGroup": "boosterPacks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "isPublic",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "openCount",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "cardAnalytics",
       "queryScope": "COLLECTION",
       "fields": [
