@@ -51,42 +51,46 @@ const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <AuthProvider>
-      <FirebaseInitializer>
-        <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Home />
-              </ProtectedRoute>
-            } />
-            <Route path="/booster-packs" element={
+      <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/booster-packs" element={
+            <FirebaseInitializer>
               <ProtectedRoute>
                 <BoosterPacks />
               </ProtectedRoute>
-            } />
-            <Route path="/collection" element={
+            </FirebaseInitializer>
+          } />
+          <Route path="/collection" element={
+            <FirebaseInitializer>
               <ProtectedRoute>
                 <Collection />
               </ProtectedRoute>
-            } />
-            <Route path="/image-generator" element={
+            </FirebaseInitializer>
+          } />
+          <Route path="/image-generator" element={
+            <FirebaseInitializer>
               <ProtectedRoute>
                 <ImageGenerator />
               </ProtectedRoute>
-            } />
-            <Route path="/marketplace/*" element={
+            </FirebaseInitializer>
+          } />
+          <Route path="/marketplace/*" element={
+            <FirebaseInitializer>
               <ProtectedRoute>
                 <Marketplace />
               </ProtectedRoute>
-            } />
-            <Route path="/claims" element={
+            </FirebaseInitializer>
+          } />
+          <Route path="/claims" element={
+            <FirebaseInitializer>
               <ProtectedRoute>
                 <Claims />
               </ProtectedRoute>
-            } />
-        </Routes>
-        <Toaster />
-      </FirebaseInitializer>
+            </FirebaseInitializer>
+          } />
+      </Routes>
+      <Toaster />
     </AuthProvider>
   );
 }

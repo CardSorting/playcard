@@ -16,12 +16,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    // Only initialize auth if we're not on the home page
+    if (window.location.pathname !== '/') {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        setUser(user);
+        setLoading(false);
+      });
+      return unsubscribe;
+    } else {
+      // Don't initialize auth for home page
       setLoading(false);
-    });
-
-    return unsubscribe;
+    }
   }, []);
 
   return (

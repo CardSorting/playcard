@@ -13,6 +13,9 @@ if (process.env.TEMPO === "true") {
 // https://vitejs.dev/config/
 export default defineConfig({
   base: process.env.VITE_BASE_PATH || "/",
+  define: {
+    __USE_EMULATORS__: process.env.VITE_USE_EMULATORS === 'true'
+  },
   optimizeDeps: {
     entries: ["src/main.tsx", "src/tempobook/**/*"],
   },

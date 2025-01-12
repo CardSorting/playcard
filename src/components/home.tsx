@@ -34,7 +34,7 @@ export default function Home() {
                   size="lg"
                   className="bg-yellow-400 hover:bg-yellow-500 text-black"
                 >
-                  <Link to="/create">Start Creating</Link>
+                  <Link to="/login">Start Creating</Link>
                 </Button>
                 <Button
                   asChild
@@ -101,7 +101,7 @@ export default function Home() {
             size="lg"
             className="bg-black text-white hover:bg-gray-900"
           >
-            <Link to="/create">Start Creating Now</Link>
+            <Link to="/login">Start Creating Now</Link>
           </Button>
         </div>
       </section>
