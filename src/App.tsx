@@ -8,6 +8,7 @@ import Collection from './components/collection';
 import ImageGenerator from './components/image-generator';
 import Marketplace from './components/marketplace';
 import Claims from './components/claims';
+import Login from './components/auth/login';
 import { Toaster } from './components/ui/toaster';
 
 // Protected route wrapper component
@@ -52,6 +53,7 @@ function App() {
     <AuthProvider>
       <FirebaseInitializer>
         <Routes>
+            <Route path="/login" element={<Login />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <Home />
