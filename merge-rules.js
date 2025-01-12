@@ -1,120 +1,235 @@
-import { readFileSync, writeFileSync, readdirSync } from 'fs';
-import { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { readFileSync, writeFileSync } from 'fs';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+class RulesMerger {
+  constructor() {
+    this.helperFunctions = new Map();
+    this.ruleBlocks = new Map();
+    this.errors = [];
+  }
 
-// Base rules structure
-const baseRules = `rules_version = '2';
+  extractHelperFunctions(content, filename) {
+    const lines = content.split('\n');
+    let inFunction = false;
+    let currentFunction = [];
+    let functionName = '';
+    let depth = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (line.startsWith('function ')) {
+        inFunction = true;
+        functionName = line.match(/function\s+([^(]+)/)[1];
+        depth = 1;
+        currentFunction = [lines[i]];
+      } else if (inFunction) {
+        currentFunction.push(lines[i]);
+        depth += (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
+
+        if (depth === 0) {
+          // Skip isValidCartItem as it's unused
+          if (functionName !== 'isValidCartItem') {
+            this.helperFunctions.set(functionName, currentFunction.join('\n'));
+          }
+          inFunction = false;
+          currentFunction = [];
+        }
+      }
+    }
+  }
+
+  extractRuleBlock(content) {
+    const lines = content.split('\n');
+    let inMainBlock = false;
+    let mainBlock = [];
+    let depth = 0;
+
+    for (const line of lines) {
+      // Skip version and service declarations
+      if (line.trim().startsWith('rules_version') ||
+          line.trim().startsWith('service cloud.firestore') ||
+          line.trim().startsWith('match /databases/{database}/documents')) {
+        continue;
+      }
+
+      // Start collecting after main database match
+      if (!inMainBlock) {
+        if (line.trim().startsWith('match /')) {
+          inMainBlock = true;
+        }
+      }
+
+      if (inMainBlock) {
+        mainBlock.push(line);
+        depth += (line.match(/{/g) || []).length - (line.match(/}/g) || []).length;
+        
+        // If we've closed all braces, we're done with this block
+        if (depth === 0) {
+          inMainBlock = false;
+        }
+      }
+    }
+
+    return mainBlock.join('\n');
+  }
+
+  processRulesFile(filename) {
+    try {
+      console.log(`Processing ${filename}...`);
+      const content = readFileSync(filename, 'utf8');
+      
+      // Extract helper functions first
+      this.extractHelperFunctions(content, filename);
+      
+      // Extract the main rules block
+      const ruleBlock = this.extractRuleBlock(content);
+      if (ruleBlock) {
+        const name = filename.replace('firestore.', '').replace('.rules', '');
+        this.ruleBlocks.set(name, ruleBlock);
+      }
+    } catch (error) {
+      this.errors.push(`Error processing ${filename}: ${error.message}`);
+    }
+  }
+
+  generateCombinedRules() {
+    // Start with the base structure and built-in functions
+    let combined = `rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper functions
+    // Built-in function wrappers
     function isAuthenticated() {
       return request.auth != null;
     }
-    
+
+    // Common helper functions
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    // Users collection
+`;
+
+    // Add helper functions in dependency order
+    const helperOrder = [
+      'isSeller',
+      'isValidListing',
+      'isValidOrder',
+      'isValidInventory',
+      'isValidReview',
+      'hasVerifiedPurchase',
+      'hasValidCartItems',
+      'isCardOwner',
+      'isValidCard',
+      'isValidGeneration',
+      'isCollaborator',
+      'hasEditPermission',
+      'isCollectionOwner',
+      'isCollectionCollaborator',
+      'hasCollectionEditAccess',
+      'isValidCollectionCard',
+      'isValidPack',
+      'isValidPackOpening',
+      'isValidPackTemplate',
+      'isValidPackCollection',
+      'canOpenPack'
+    ];
+
+    helperOrder.forEach(name => {
+      const func = this.helperFunctions.get(name);
+      if (func) {
+        combined += `    ${func}\n\n`;
+      }
+    });
+
+    // Add any remaining helper functions not in the order
+    this.helperFunctions.forEach((func, name) => {
+      if (!helperOrder.includes(name) && name !== 'isOwner') {
+        combined += `    ${func}\n\n`;
+      }
+    });
+
+    // Base user rules
+    combined += `    // Base user rules
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated() && isOwner(userId);
       allow update: if isOwner(userId);
-      allow delete: if false; // Users cannot be deleted
+      allow delete: if false;
     }
+`;
 
-    // Rules will be merged here
-  }
-}`;
+    // Add rule blocks in specific order
+    const blockOrder = [
+      'marketplace',
+      'cart',
+      'card-creator',
+      'card-generation',
+      'card-collaboration',
+      'collection',
+      'booster-packs',
+      'claims'
+    ];
 
-// Function to extract rules content (everything between first and last match block)
-function extractRules(content) {
-  const lines = content.split('\n');
-  let rules = [];
-  let isCollectingRules = false;
-  let functionBuffer = [];
-  let isFunctionBlock = false;
-  let matchBlockDepth = 0;
-
-  for (const line of lines) {
-    // Skip empty lines and comments at the start
-    if (rules.length === 0 && (line.trim() === '' || line.trim().startsWith('//'))) {
-      continue;
-    }
-
-    // Collect function definitions
-    if (line.trim().startsWith('function ')) {
-      isFunctionBlock = true;
-      functionBuffer = [line];
-      continue;
-    }
-    
-    if (isFunctionBlock) {
-      functionBuffer.push(line);
-      if (line.trim().endsWith('}')) {
-        rules.push(functionBuffer.join('\n'));
-        functionBuffer = [];
-        isFunctionBlock = false;
+    blockOrder.forEach(name => {
+      const rules = this.ruleBlocks.get(name);
+      if (rules) {
+        // Fix the type error in booster packs section
+        let processedRules = rules;
+        if (name === 'booster-packs') {
+          // Fix the packAnalytics rules to properly check pack ownership
+          processedRules = rules.replace(
+            /allow read: if isAuthenticated\(\) && \(\s*resource\.data\.packId in get\([^)]+\)\.data\.userId == request\.auth\.uid\s*\);/g,
+            'allow read: if isAuthenticated() && exists(/databases/$(database)/documents/boosterPacks/$(resource.data.packId)) && get(/databases/$(database)/documents/boosterPacks/$(resource.data.packId)).data.userId == request.auth.uid;'
+          );
+        }
+        combined += `\n    // ${name} rules\n${processedRules}\n`;
       }
-      continue;
-    }
+    });
 
-    // Track match block depth
-    if (line.trim().startsWith('match /')) {
-      isCollectingRules = true;
-      matchBlockDepth++;
-    }
-    
-    if (isCollectingRules) {
-      rules.push(line);
-      
-      // Count additional nested braces
-      const openBraces = (line.match(/{/g) || []).length;
-      const closeBraces = (line.match(/}/g) || []).length;
-      matchBlockDepth += openBraces - closeBraces;
-      
-      // Only stop collecting when we've closed all match blocks
-      if (matchBlockDepth === 0) {
-        isCollectingRules = false;
+    // Add any remaining blocks not in the order
+    this.ruleBlocks.forEach((rules, name) => {
+      if (!blockOrder.includes(name)) {
+        combined += `\n    // ${name} rules\n${rules}\n`;
       }
-    }
-  }
+    });
 
-  return rules.join('\n');
+    // Close the main blocks
+    combined += '  }\n}';
+
+    return combined;
+  }
 }
 
-// Read all rules files in specific order
-const ruleFiles = [
+const RULES_FILES = [
   'firestore.marketplace.rules',
   'firestore.cart.rules',
   'firestore.card-creator.rules',
   'firestore.card-generation.rules',
   'firestore.card-collaboration.rules',
-  'firestore.collection.rules'
-].filter(file => readdirSync('.').includes(file));
+  'firestore.collection.rules',
+  'firestore.booster-packs.rules',
+  'firestore.claims.rules'
+];
 
-// Extract and combine rules
-let combinedRules = baseRules;
-const insertPoint = combinedRules.indexOf('// Rules will be merged here');
-
-for (const file of ruleFiles) {
-  console.log(`Processing ${file}...`);
-  const content = readFileSync(file, 'utf8');
-  const rules = extractRules(content);
+try {
+  console.log('Starting rules merge...');
+  const merger = new RulesMerger();
   
-  // Insert rules at the marked position
-  combinedRules = combinedRules.slice(0, insertPoint) + 
-    '\n    // Rules from ' + file + '\n' + 
-    rules + '\n' +
-    combinedRules.slice(insertPoint);
+  // Process each rules file
+  RULES_FILES.forEach(file => merger.processRulesFile(file));
+
+  // Generate and write combined rules
+  const mergedRules = merger.generateCombinedRules();
+  writeFileSync('firestore.rules', mergedRules);
+  
+  console.log('\nRules merged successfully into firestore.rules');
+  console.log('\nHelper functions found:');
+  merger.helperFunctions.forEach((_, name) => {
+    console.log(`- ${name}`);
+  });
+  
+} catch (error) {
+  console.error('Fatal error:', error);
+  process.exit(1);
 }
-
-// Remove the merge marker
-combinedRules = combinedRules.replace('// Rules will be merged here', '');
-
-// Write combined rules
-writeFileSync('firestore.rules', combinedRules);
-console.log('Rules merged successfully into firestore.rules');

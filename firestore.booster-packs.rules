@@ -78,11 +78,14 @@ match /packOpenings/{openingId} {
   allow delete: if false; // Pack openings are permanent
 }
 
+function isPackAnalyticsOwner(packId) {
+  let pack = get(/databases/$(database)/documents/boosterPacks/$(packId));
+  return pack != null && pack.data.userId == request.auth.uid;
+}
+
 // Pack Analytics
 match /packAnalytics/{analyticsId} {
-  allow read: if isAuthenticated() && (
-    resource.data.packId in get(/databases/$(database)/documents/boosterPacks/$(resource.data.packId)).data.userId == request.auth.uid
-  );
+  allow read: if isAuthenticated() && isPackAnalyticsOwner(resource.data.packId);
   allow write: if false; // Only through server functions
 }
 
