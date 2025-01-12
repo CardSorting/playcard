@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, ImageIcon, Download } from "lucide-react";
+import { Loader2, ImageIcon, Download, History } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import axios from "axios";
+import { useAuth } from "@/lib/contexts/auth-context";
+import { db } from "@/lib/firebase";
+import { collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 
 interface GenerationResult {
   taskId: string;
@@ -19,14 +23,86 @@ interface GenerationResult {
   status: "pending" | "completed" | "error";
 }
 
+interface StoredGeneration {
+  id: string;
+  userId: string;
+  prompt: string;
+  imageUrl: string;
+  aspectRatio: string;
+  createdAt: Date;
+}
+
 export default function ImageGenerator() {
   const [prompt, setPrompt] = useState("");
   const [aspectRatio, setAspectRatio] = useState("16:9");
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
+  const [previousGenerations, setPreviousGenerations] = useState<StoredGeneration[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      loadPreviousGenerations();
+    }
+  }, [user]);
+
+  const loadPreviousGenerations = async () => {
+    if (!user) return;
+
+    try {
+      const generationsRef = collection(db, "generatedImages");
+      const q = query(
+        generationsRef,
+        where("userId", "==", user.uid),
+        orderBy("createdAt", "desc")
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const generations = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt.toDate()
+      })) as StoredGeneration[];
+      
+      setPreviousGenerations(generations);
+    } catch (error) {
+      console.error("Error loading previous generations:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load previous generations",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const storeGeneration = async (imageUrl: string) => {
+    if (!user) return;
+
+    try {
+      const generationsRef = collection(db, "generatedImages");
+      await addDoc(generationsRef, {
+        userId: user.uid,
+        prompt,
+        imageUrl,
+        aspectRatio,
+        createdAt: new Date()
+      });
+
+      await loadPreviousGenerations(); // Refresh the list
+    } catch (error) {
+      console.error("Error storing generation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save generation history",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleGenerate = async () => {
-    if (!prompt) return;
+    if (!prompt || !user) return;
 
     setIsGenerating(true);
     setResult({ taskId: "", status: "pending" });
@@ -57,17 +133,32 @@ export default function ImageGenerator() {
             "x-api-key": import.meta.env.VITE_GOAPI_KEY || "",
             "Content-Type": "application/json",
           },
-        },
+        }
       );
 
+      const imageUrl = response.data.image_url;
+      
       setResult({
         taskId: response.data.task_id,
         status: "completed",
-        imageUrl: response.data.image_url, // Adjust based on actual API response
+        imageUrl,
+      });
+
+      // Store the generation in Firestore
+      await storeGeneration(imageUrl);
+
+      toast({
+        title: "Success",
+        description: "Image generated successfully!",
       });
     } catch (error) {
       console.error("Error generating image:", error);
       setResult({ taskId: "", status: "error" });
+      toast({
+        title: "Error",
+        description: "Failed to generate image",
+        variant: "destructive",
+      });
     } finally {
       setIsGenerating(false);
     }
@@ -116,67 +207,121 @@ export default function ImageGenerator() {
                 </Select>
               </div>
 
-              <Button
-                className="w-full bg-yellow-400 hover:bg-yellow-500 text-black"
-                onClick={handleGenerate}
-                disabled={!prompt || isGenerating}
-              >
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="w-4 h-4 mr-2" />
-                    Generate Image
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-4">
+                <Button
+                  className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black"
+                  onClick={handleGenerate}
+                  disabled={!prompt || isGenerating || !user}
+                >
+                  {isGenerating ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                      Generate Image
+                    </>
+                  )}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="bg-white/5 border-gray-700 text-white hover:bg-white/10"
+                  onClick={() => setShowHistory(!showHistory)}
+                >
+                  <History className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {!user && (
+                <p className="text-sm text-yellow-400">
+                  Please sign in to generate images
+                </p>
+              )}
             </div>
           </Card>
 
           {/* Preview Section */}
           <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800">
-            <div className="aspect-square w-full rounded-lg overflow-hidden relative">
-              {result?.imageUrl ? (
-                <>
-                  <img
-                    src={result.imageUrl}
-                    alt="Generated artwork"
-                    className="w-full h-full object-cover"
-                  />
+            {showHistory ? (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold text-white">Generation History</h3>
                   <Button
-                    className="absolute bottom-4 right-4 bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white"
-                    onClick={() => window.open(result.imageUrl, "_blank")}
+                    variant="ghost"
+                    className="text-gray-400 hover:text-white"
+                    onClick={() => setShowHistory(false)}
                   >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
+                    Close
                   </Button>
-                </>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-white/5">
-                  {isGenerating ? (
-                    <div className="text-center">
-                      <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin text-yellow-400" />
-                      <p className="text-sm text-gray-400">
-                        Creating your masterpiece...
+                </div>
+                <div className="space-y-4 max-h-[500px] overflow-y-auto">
+                  {previousGenerations.map((gen) => (
+                    <div
+                      key={gen.id}
+                      className="border border-gray-700 rounded-lg p-4 space-y-2"
+                    >
+                      <img
+                        src={gen.imageUrl}
+                        alt={gen.prompt}
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                      <p className="text-sm text-gray-400">{gen.prompt}</p>
+                      <p className="text-xs text-gray-500">
+                        {gen.createdAt.toLocaleDateString()}
                       </p>
                     </div>
-                  ) : result?.status === "error" ? (
-                    <div className="text-center text-red-400">
-                      <p>Error generating image.</p>
-                      <p className="text-sm">Please try again.</p>
-                    </div>
-                  ) : (
-                    <div className="text-center text-gray-400">
-                      <ImageIcon className="w-8 h-8 mb-2 mx-auto" />
-                      <p>Your generated image will appear here</p>
-                    </div>
+                  ))}
+                  {previousGenerations.length === 0 && (
+                    <p className="text-gray-400 text-center py-4">
+                      No previous generations found
+                    </p>
                   )}
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="aspect-square w-full rounded-lg overflow-hidden relative">
+                {result?.imageUrl ? (
+                  <>
+                    <img
+                      src={result.imageUrl}
+                      alt="Generated artwork"
+                      className="w-full h-full object-cover"
+                    />
+                    <Button
+                      className="absolute bottom-4 right-4 bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white"
+                      onClick={() => window.open(result.imageUrl, "_blank")}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-white/5">
+                    {isGenerating ? (
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin text-yellow-400" />
+                        <p className="text-sm text-gray-400">
+                          Creating your masterpiece...
+                        </p>
+                      </div>
+                    ) : result?.status === "error" ? (
+                      <div className="text-center text-red-400">
+                        <p>Error generating image.</p>
+                        <p className="text-sm">Please try again.</p>
+                      </div>
+                    ) : (
+                      <div className="text-center text-gray-400">
+                        <ImageIcon className="w-8 h-8 mb-2 mx-auto" />
+                        <p>Your generated image will appear here</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </Card>
         </div>
       </div>

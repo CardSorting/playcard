@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { ImageIcon, LinkIcon } from "lucide-react";
+import { ImageIcon, LinkIcon, Loader2 } from "lucide-react";
+import { uploadImage } from "@/lib/storage";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Props {
   onImageSelect: (imageUrl: string) => void;
@@ -12,6 +14,8 @@ interface Props {
 export default function ImageUploader({ onImageSelect }: Props) {
   const [imageUrl, setImageUrl] = useState("");
   const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
 
   const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,14 +25,40 @@ export default function ImageUploader({ onImageSelect }: Props) {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload an image file (JPG, PNG, GIF)",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const downloadUrl = await uploadImage(file);
+      onImageSelect(downloadUrl);
+      toast({
+        title: "Image uploaded",
+        description: "Your image has been uploaded successfully",
+      });
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your image. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onImageSelect(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      handleFileUpload(file);
     }
   };
 
@@ -48,12 +78,8 @@ export default function ImageUploader({ onImageSelect }: Props) {
     setDragActive(false);
 
     const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onImageSelect(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (file) {
+      handleFileUpload(file);
     }
   };
 
@@ -74,18 +100,28 @@ export default function ImageUploader({ onImageSelect }: Props) {
         <input
           type="file"
           accept="image/*"
-          onChange={handleFileUpload}
+          onChange={handleFileInputChange}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          disabled={uploading}
         />
         <div className="text-center">
-          <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-          <p className="text-sm text-gray-300 mb-1">
-            <span className="hidden sm:inline">
-              Drag and drop your image here, or{" "}
-            </span>
-            <span>click to select</span>
-          </p>
-          <p className="text-xs text-gray-500">Supports: JPG, PNG, GIF</p>
+          {uploading ? (
+            <>
+              <Loader2 className="w-8 h-8 mx-auto mb-2 text-gray-400 animate-spin" />
+              <p className="text-sm text-gray-300 mb-1">Uploading...</p>
+            </>
+          ) : (
+            <>
+              <ImageIcon className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+              <p className="text-sm text-gray-300 mb-1">
+                <span className="hidden sm:inline">
+                  Drag and drop your image here, or{" "}
+                </span>
+                <span>click to select</span>
+              </p>
+              <p className="text-xs text-gray-500">Supports: JPG, PNG, GIF</p>
+            </>
+          )}
         </div>
       </div>
 
@@ -108,11 +144,13 @@ export default function ImageUploader({ onImageSelect }: Props) {
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             className="flex-1 bg-white/5 border-gray-700 text-white placeholder:text-gray-500"
+            disabled={uploading}
           />
           <Button
             type="submit"
             variant="secondary"
             className="bg-white/5 text-white hover:bg-white/10 w-full sm:w-auto"
+            disabled={uploading || !imageUrl}
           >
             <LinkIcon className="w-4 h-4 mr-2" />
             Add

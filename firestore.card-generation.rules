@@ -1,0 +1,53 @@
+// Card Generation helper functions
+function isValidGeneration(gen) {
+  return gen.size() > 0
+    && gen.userId == request.auth.uid
+    && gen.prompt.size() > 0;
+}
+
+// Card Generation collection
+match /cardGeneration/{generationId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow create: if isAuthenticated() 
+    && isValidGeneration(request.resource.data);
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.userId == resource.data.userId
+    && request.resource.data.diff(resource.data).affectedKeys()
+      .hasOnly(['status', 'results', 'error', 'completedAt', 'updatedAt']);
+  allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+}
+
+// Card Comments collection
+match /cardComments/{commentId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() 
+    && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys()
+      .hasOnly(['content', 'reactions', 'updatedAt', 'editedAt']);
+  allow delete: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid;
+}
+
+// Card Sets collection
+match /cardSets/{setId} {
+  allow read: if isAuthenticated();
+  allow write: if false; // Only through admin functions
+}
+
+// Card Assets collection
+match /cardAssets/{assetId} {
+  allow read: if isAuthenticated() && (
+    resource.data.isPublic == true || 
+    resource.data.userId == request.auth.uid
+  );
+  allow create: if isAuthenticated() 
+    && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.userId == resource.data.userId;
+  allow delete: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid;
+}

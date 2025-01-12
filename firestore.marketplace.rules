@@ -1,0 +1,181 @@
+// Marketplace helper functions
+function isSeller(userId) {
+  let user = get(/databases/$(database)/documents/users/$(userId));
+  return user != null && user.data.isSeller == true;
+}
+
+function isValidListing(listing) {
+  return listing.size() > 0 
+    && listing.type.matches('^(card|pack)$')
+    && listing.itemId.size() > 0
+    && listing.item.size() > 0
+    && listing.price > 0
+    && listing.quantity > 0
+    && listing.sellerId == request.auth.uid
+    && listing.sellerName.size() > 0
+    && listing.status.matches('^(active|sold|cancelled)$')
+    && listing.rating >= 0
+    && listing.rating <= 5
+    && listing.reviewCount >= 0
+    && listing.deliveryTime.size() > 0;
+}
+
+function isValidOrder(order) {
+  return order.size() > 0 
+    && order.items.size() > 0
+    && order.totalAmount > 0
+    && order.items[0].price > 0
+    && order.items[0].quantity > 0
+    && order.paymentStatus.matches('^(pending|completed|failed|refunded)$')
+    && order.status.matches('^(pending|processing|completed|cancelled|disputed)$')
+    && order.shippingAddress.size() > 0;
+}
+
+function isValidInventory(inventory) {
+  return inventory.size() > 0
+    && inventory.totalQuantity >= 0
+    && inventory.availableQuantity >= 0
+    && inventory.reservedQuantity >= 0
+    && inventory.totalQuantity == (inventory.availableQuantity + inventory.reservedQuantity);
+}
+
+function isValidReview(review) {
+  return review.size() > 0
+    && review.listingId.size() > 0
+    && review.orderId.size() > 0
+    && review.sellerId.size() > 0
+    && review.userId == request.auth.uid
+    && review.userName.size() > 0
+    && review.rating >= 1
+    && review.rating <= 5
+    && review.comment.size() > 0
+    && review.status.matches('^(pending|approved|rejected)$')
+    && (!review.title || review.title.size() <= 100)
+    && (!review.images || review.images.size() <= 5);
+}
+
+function hasVerifiedPurchase(orderId, userId) {
+  let order = get(/databases/$(database)/documents/orders/$(orderId));
+  return order != null 
+    && order.data.buyerId == userId 
+    && order.data.status == 'completed';
+}
+
+// Listings collection
+match /listings/{listingId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() 
+    && isValidListing(request.resource.data)
+    && (
+      // For card listings
+      (request.resource.data.type == 'card' && 
+       request.resource.data.item.type.matches('^(Normal|Fire|Water|Electric|Grass|Ice|Fighting|Poison|Ground|Flying|Psychic|Bug|Rock|Ghost|Dragon|Dark|Steel|Fairy)$')) ||
+      // For pack listings
+      (request.resource.data.type == 'pack')
+    );
+  allow update: if isAuthenticated() 
+    && request.resource.data.sellerId == resource.data.sellerId 
+    && resource.data.sellerId == request.auth.uid
+    && request.resource.data.type == resource.data.type
+    && request.resource.data.itemId == resource.data.itemId;
+  allow delete: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+
+  // Likes subcollection
+  match /likes/{userId} {
+    allow read: if isAuthenticated();
+    allow create: if isAuthenticated() && request.auth.uid == userId;
+    allow delete: if isAuthenticated() && request.auth.uid == userId;
+  }
+
+  // Reviews subcollection
+  match /reviews/{reviewId} {
+    allow read: if isAuthenticated();
+    allow create: if isAuthenticated() 
+      && isValidReview(request.resource.data)
+      && hasVerifiedPurchase(request.resource.data.orderId, request.auth.uid);
+    allow update: if isAuthenticated() 
+      && resource.data.userId == request.auth.uid
+      && request.resource.data.userId == resource.data.userId
+      && request.resource.data.listingId == resource.data.listingId
+      && request.resource.data.orderId == resource.data.orderId
+      && request.resource.data.sellerId == resource.data.sellerId;
+    allow delete: if false;
+  }
+}
+
+// Orders
+match /orders/{orderId} {
+  allow create: if isAuthenticated() 
+    && request.resource.data.buyerId == request.auth.uid 
+    && isValidOrder(request.resource.data);
+  allow read: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.items[0].sellerId == request.auth.uid);
+  allow update: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.items[0].sellerId == request.auth.uid)
+    && request.resource.data.buyerId == resource.data.buyerId
+    && request.resource.data.items[0].sellerId == resource.data.items[0].sellerId;
+  allow delete: if false;
+}
+
+// Inventory
+match /inventory/{inventoryId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() 
+    && isSeller(request.auth.uid)
+    && request.resource.data.sellerId == request.auth.uid
+    && isValidInventory(request.resource.data);
+  allow update: if isAuthenticated()
+    && resource.data.sellerId == request.auth.uid
+    && isValidInventory(request.resource.data);
+  allow delete: if false;
+}
+
+// Disputes
+match /disputes/{disputeId} {
+  allow read: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.sellerId == request.auth.uid);
+  allow create: if isAuthenticated() 
+    && request.resource.data.buyerId == request.auth.uid
+    && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+    && request.resource.data.status == 'open';
+  allow update: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.sellerId == request.auth.uid)
+    && request.resource.data.buyerId == resource.data.buyerId
+    && request.resource.data.sellerId == resource.data.sellerId
+    && request.resource.data.orderId == resource.data.orderId;
+  allow delete: if false;
+}
+
+// Transactions
+match /transactions/{transactionId} {
+  allow read: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.sellerId == request.auth.uid);
+  allow write: if false; // Only through server functions
+}
+
+// Analytics
+match /sellerAnalytics/{analyticsId} {
+  allow read: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+match /marketStats/{statsId} {
+  allow read: if isAuthenticated();
+  allow write: if false; // Only through server functions
+}
+
+// User Profiles
+match /users/{userId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() && isOwner(userId);
+  allow update: if isAuthenticated() 
+    && isOwner(userId)
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isSeller', 'sellerRating', 'totalSales', 'totalRevenue']) 
+        || (isSeller(userId) && isOwner(userId)));
+  allow delete: if false;
+}

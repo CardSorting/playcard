@@ -1,0 +1,537 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if false; // Users cannot be deleted
+    }
+
+    
+    // Rules from firestore.collection.rules
+function isCollectionOwner(collectionId) {
+  return get(/databases/$(database)/documents/collections/$(collectionId)).data.userId == request.auth.uid;
+}
+function isCollectionCollaborator(collectionId) {
+  let sharing = get(/databases/$(database)/documents/collectionSharing/$(collectionId));
+  return sharing != null && sharing.data.collaborators[request.auth.uid] != null;
+}
+function hasCollectionEditAccess(collectionId) {
+  let sharing = get(/databases/$(database)/documents/collectionSharing/$(collectionId));
+  return sharing != null && sharing.data.collaborators[request.auth.uid].role == 'editor';
+}
+function isValidCollectionCard(card) {
+  return card.size() > 0
+    && card.cardId.size() > 0
+    && card.snapshot.size() > 0
+    && card.snapshot.name.size() > 0
+    && card.snapshot.type.matches('^(Normal|Fire|Water|Electric|Grass|Ice|Fighting|Poison|Ground|Flying|Psychic|Bug|Rock|Ghost|Dragon|Dark|Steel|Fairy)$');
+}
+match /collections/{collectionId} {
+  allow read: if isAuthenticated() && (
+    resource.data.isPublic == true || 
+    isCollectionOwner(collectionId) ||
+    isCollectionCollaborator(collectionId)
+  );
+  allow create: if isAuthenticated() 
+    && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() && (
+    isCollectionOwner(collectionId) ||
+    hasCollectionEditAccess(collectionId)
+  );
+  allow delete: if isAuthenticated() && isCollectionOwner(collectionId);
+}
+
+// Collection Cards
+match /collectionCards/{cardId} {
+  allow read: if isAuthenticated() && (
+    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
+    isCollectionOwner(resource.data.collectionId) ||
+    isCollectionCollaborator(resource.data.collectionId)
+  );
+  allow create: if isAuthenticated() 
+    && isCollectionOwner(request.resource.data.collectionId)
+    && isValidCollectionCard(request.resource.data);
+  allow update: if isAuthenticated() && (
+    isCollectionOwner(resource.data.collectionId) ||
+    hasCollectionEditAccess(resource.data.collectionId)
+  );
+  allow delete: if isAuthenticated() && isCollectionOwner(resource.data.collectionId);
+}
+
+// Collection Stats
+match /collectionStats/{statsId} {
+  allow read: if isAuthenticated() && (
+    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
+    isCollectionOwner(resource.data.collectionId) ||
+    isCollectionCollaborator(resource.data.collectionId)
+  );
+  allow write: if false; // Only through functions
+}
+
+// Collection Sharing
+match /collectionSharing/{sharingId} {
+  allow read: if isAuthenticated() && (
+    isCollectionOwner(sharingId) ||
+    resource.data.collaborators[request.auth.uid] != null ||
+    (resource.data.visibility == 'link' && request.auth.token.email == resource.data.shareLink.allowedEmail)
+  );
+  allow create: if isAuthenticated() && isCollectionOwner(request.resource.data.collectionId);
+  allow update: if isAuthenticated() && (
+    isCollectionOwner(resource.data.collectionId) ||
+    (resource.data.collaborators[request.auth.uid].role == 'editor' &&
+     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accessLog']))
+  );
+  allow delete: if isAuthenticated() && isCollectionOwner(resource.data.collectionId);
+}
+
+// Collection Achievements
+match /collectionAchievements/{achievementId} {
+  allow read: if isAuthenticated() && (
+    resource.data.userId == request.auth.uid ||
+    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true
+  );
+  allow write: if false; // Only through functions
+}
+
+// Collection Trades
+match /collectionTrades/{tradeId} {
+  allow read: if isAuthenticated() && (
+    resource.data.initiatorId == request.auth.uid ||
+    resource.data.recipientId == request.auth.uid
+  );
+  allow create: if isAuthenticated() 
+    && request.resource.data.initiatorId == request.auth.uid
+    && request.resource.data.offer.size() == 2;
+  allow update: if isAuthenticated() && (
+    resource.data.initiatorId == request.auth.uid ||
+    resource.data.recipientId == request.auth.uid
+  ) && (
+    // Only allow updating specific fields
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'offer', 'messages', 'verification', 'updatedAt']) ||
+    // Or completing the trade
+    (request.resource.data.status == 'completed' && resource.data.verification.initiatorConfirmed && resource.data.verification.recipientConfirmed)
+  );
+  allow delete: if false; // Trades are archived, not deleted
+}
+
+// Collection Display Settings
+match /collectionDisplay/{displayId} {
+  allow read: if isAuthenticated() && (
+    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
+    isCollectionOwner(resource.data.collectionId) ||
+    isCollectionCollaborator(resource.data.collectionId)
+  );
+  allow write: if isAuthenticated() && (
+    isCollectionOwner(resource.data.collectionId) ||
+    hasCollectionEditAccess(resource.data.collectionId)
+  );
+}
+
+    // Rules from firestore.card-collaboration.rules
+function isCollaborator(cardId) {
+  let collab = get(/databases/$(database)/documents/cardCollaborations/$(cardId));
+  return collab != null && (
+    collab.data.owner.userId == request.auth.uid ||
+    collab.data.collaborators[request.auth.uid] != null
+  );
+}
+function hasEditPermission(cardId) {
+  let collab = get(/databases/$(database)/documents/cardCollaborations/$(cardId));
+  return collab != null && (
+    collab.data.owner.userId == request.auth.uid ||
+    collab.data.collaborators[request.auth.uid].role == 'editor'
+  );
+}
+match /cardCollaborations/{collaborationId} {
+  allow read: if isAuthenticated() && isCollaborator(collaborationId);
+  allow create: if isAuthenticated() 
+    && request.resource.data.owner.userId == request.auth.uid;
+  allow update: if isAuthenticated() && (
+    // Owner can update everything
+    resource.data.owner.userId == request.auth.uid ||
+    // Editors can update activity log
+    (hasEditPermission(collaborationId) &&
+     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activity']))
+  );
+  allow delete: if isAuthenticated() 
+    && resource.data.owner.userId == request.auth.uid;
+}
+
+// Collaboration Activity collection
+match /collaborationActivity/{activityId} {
+  allow read: if isAuthenticated() 
+    && isCollaborator(resource.data.cardId);
+  allow create: if isAuthenticated() 
+    && isCollaborator(request.resource.data.cardId)
+    && request.resource.data.userId == request.auth.uid;
+  allow update, delete: if false;
+}
+
+// Collaboration Invites collection
+match /collaborationInvites/{inviteId} {
+  allow read: if isAuthenticated() && (
+    resource.data.inviterId == request.auth.uid ||
+    resource.data.inviteeEmail == request.auth.token.email
+  );
+  allow create: if isAuthenticated() 
+    && request.resource.data.inviterId == request.auth.uid
+    && isCardOwner(request.resource.data.cardId);
+  allow update: if isAuthenticated() && (
+    // Inviter can cancel
+    resource.data.inviterId == request.auth.uid ||
+    // Invitee can accept/reject
+    resource.data.inviteeEmail == request.auth.token.email
+  ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+  allow delete: if isAuthenticated() 
+    && resource.data.inviterId == request.auth.uid;
+}
+
+    // Rules from firestore.card-generation.rules
+function isValidGeneration(gen) {
+  return gen.size() > 0
+    && gen.userId == request.auth.uid
+    && gen.prompt.size() > 0;
+}
+match /cardGeneration/{generationId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow create: if isAuthenticated() 
+    && isValidGeneration(request.resource.data);
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.userId == resource.data.userId
+    && request.resource.data.diff(resource.data).affectedKeys()
+      .hasOnly(['status', 'results', 'error', 'completedAt', 'updatedAt']);
+  allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+}
+
+// Card Comments collection
+match /cardComments/{commentId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() 
+    && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.diff(resource.data).affectedKeys()
+      .hasOnly(['content', 'reactions', 'updatedAt', 'editedAt']);
+  allow delete: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid;
+}
+
+// Card Sets collection
+match /cardSets/{setId} {
+  allow read: if isAuthenticated();
+  allow write: if false; // Only through admin functions
+}
+
+// Card Assets collection
+match /cardAssets/{assetId} {
+  allow read: if isAuthenticated() && (
+    resource.data.isPublic == true || 
+    resource.data.userId == request.auth.uid
+  );
+  allow create: if isAuthenticated() 
+    && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.userId == resource.data.userId;
+  allow delete: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid;
+}
+
+    // Rules from firestore.card-creator.rules
+function isCardOwner(cardId) {
+  return get(/databases/$(database)/documents/cardTemplates/$(cardId)).data.creatorId == request.auth.uid;
+}
+function isValidCard(card) {
+  return card.size() > 0 
+    && card.name.size() > 0 
+    && card.type.matches('^(Normal|Fire|Water|Electric|Grass|Ice|Fighting|Poison|Ground|Flying|Psychic|Bug|Rock|Ghost|Dragon|Dark|Steel|Fairy)$')
+    && card.creatorId == request.auth.uid;
+}
+match /cardTemplates/{cardId} {
+  allow read: if isAuthenticated() && (
+    resource.data.isPublic == true || 
+    resource.data.creatorId == request.auth.uid
+  );
+  allow create: if isAuthenticated() && isValidCard(request.resource.data);
+  allow update: if isAuthenticated() 
+    && resource.data.creatorId == request.auth.uid
+    && request.resource.data.creatorId == resource.data.creatorId;
+  allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
+}
+
+// Card Analytics collection
+match /cardAnalytics/{analyticsId} {
+  allow read: if isAuthenticated() && isCardOwner(analyticsId);
+  allow update: if isAuthenticated() && (
+    // Allow incrementing view count
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'updatedAt']) ||
+    // Allow full updates by owner
+    isCardOwner(analyticsId)
+  );
+  allow create, delete: if false;
+}
+
+// Card Versions collection
+match /cardVersions/{versionId} {
+  allow read: if isAuthenticated() && isCardOwner(resource.data.cardId);
+  allow create: if isAuthenticated() && isCardOwner(request.resource.data.cardId);
+  allow update, delete: if false;
+}
+
+// Card Collections collection
+match /cardCollections/{collectionId} {
+  allow read: if isAuthenticated() && (
+    resource.data.isPublic == true || 
+    resource.data.userId == request.auth.uid
+  );
+  allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+}
+
+    // Rules from firestore.cart.rules
+function isValidCartItem(item) {
+  return item.size() > 0
+    && item.quantity > 0
+    && item.price > 0
+    && exists(/databases/$(database)/documents/listings/$(item.listingId));
+}
+function hasValidCartItems(items) {
+  return items.size() > 0 && items.hasAll(['id', 'listingId', 'quantity', 'price', 'sellerId']);
+}
+match /carts/{cartId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow create: if isAuthenticated() 
+    && request.resource.data.userId == request.auth.uid
+    && (!request.resource.data.items || hasValidCartItems(request.resource.data.items));
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.userId == resource.data.userId
+    && (!request.resource.data.items || hasValidCartItems(request.resource.data.items));
+  allow delete: if false; // Carts are archived, not deleted
+}
+
+// Cart Analytics
+match /cartAnalytics/{analyticsId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Cart Recovery
+match /cartRecovery/{recoveryId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Cart Validation
+match /cartValidations/{validationId} {
+  allow read: if isAuthenticated() 
+    && get(/databases/$(database)/documents/carts/$(resource.data.cartId)).data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Cart Merges
+match /cartMerges/{mergeId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Checkout Sessions
+match /checkoutSessions/{sessionId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow delete: if false;
+}
+
+    // Rules from firestore.marketplace.rules
+function isSeller(userId) {
+  let user = get(/databases/$(database)/documents/users/$(userId));
+  return user != null && user.data.isSeller == true;
+}
+function isValidListing(listing) {
+  return listing.size() > 0 
+    && listing.type.matches('^(card|pack)$')
+    && listing.itemId.size() > 0
+    && listing.item.size() > 0
+    && listing.price > 0
+    && listing.quantity > 0
+    && listing.sellerId == request.auth.uid
+    && listing.sellerName.size() > 0
+    && listing.status.matches('^(active|sold|cancelled)$')
+    && listing.rating >= 0
+    && listing.rating <= 5
+    && listing.reviewCount >= 0
+    && listing.deliveryTime.size() > 0;
+}
+function isValidOrder(order) {
+  return order.size() > 0 
+    && order.items.size() > 0
+    && order.totalAmount > 0
+    && order.items[0].price > 0
+    && order.items[0].quantity > 0
+    && order.paymentStatus.matches('^(pending|completed|failed|refunded)$')
+    && order.status.matches('^(pending|processing|completed|cancelled|disputed)$')
+    && order.shippingAddress.size() > 0;
+}
+function isValidInventory(inventory) {
+  return inventory.size() > 0
+    && inventory.totalQuantity >= 0
+    && inventory.availableQuantity >= 0
+    && inventory.reservedQuantity >= 0
+    && inventory.totalQuantity == (inventory.availableQuantity + inventory.reservedQuantity);
+}
+function isValidReview(review) {
+  return review.size() > 0
+    && review.listingId.size() > 0
+    && review.orderId.size() > 0
+    && review.sellerId.size() > 0
+    && review.userId == request.auth.uid
+    && review.userName.size() > 0
+    && review.rating >= 1
+    && review.rating <= 5
+    && review.comment.size() > 0
+    && review.status.matches('^(pending|approved|rejected)$')
+    && (!review.title || review.title.size() <= 100)
+    && (!review.images || review.images.size() <= 5);
+}
+function hasVerifiedPurchase(orderId, userId) {
+  let order = get(/databases/$(database)/documents/orders/$(orderId));
+  return order != null 
+    && order.data.buyerId == userId 
+    && order.data.status == 'completed';
+}
+match /listings/{listingId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() 
+    && isValidListing(request.resource.data)
+    && (
+      // For card listings
+      (request.resource.data.type == 'card' && 
+       request.resource.data.item.type.matches('^(Normal|Fire|Water|Electric|Grass|Ice|Fighting|Poison|Ground|Flying|Psychic|Bug|Rock|Ghost|Dragon|Dark|Steel|Fairy)$')) ||
+      // For pack listings
+      (request.resource.data.type == 'pack')
+    );
+  allow update: if isAuthenticated() 
+    && request.resource.data.sellerId == resource.data.sellerId 
+    && resource.data.sellerId == request.auth.uid
+    && request.resource.data.type == resource.data.type
+    && request.resource.data.itemId == resource.data.itemId;
+  allow delete: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+
+  // Likes subcollection
+  match /likes/{userId} {
+    allow read: if isAuthenticated();
+    allow create: if isAuthenticated() && request.auth.uid == userId;
+    allow delete: if isAuthenticated() && request.auth.uid == userId;
+  }
+
+  // Reviews subcollection
+  match /reviews/{reviewId} {
+    allow read: if isAuthenticated();
+    allow create: if isAuthenticated() 
+      && isValidReview(request.resource.data)
+      && hasVerifiedPurchase(request.resource.data.orderId, request.auth.uid);
+    allow update: if isAuthenticated() 
+      && resource.data.userId == request.auth.uid
+      && request.resource.data.userId == resource.data.userId
+      && request.resource.data.listingId == resource.data.listingId
+      && request.resource.data.orderId == resource.data.orderId
+      && request.resource.data.sellerId == resource.data.sellerId;
+    allow delete: if false;
+  }
+}
+
+// Orders
+match /orders/{orderId} {
+  allow create: if isAuthenticated() 
+    && request.resource.data.buyerId == request.auth.uid 
+    && isValidOrder(request.resource.data);
+  allow read: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.items[0].sellerId == request.auth.uid);
+  allow update: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.items[0].sellerId == request.auth.uid)
+    && request.resource.data.buyerId == resource.data.buyerId
+    && request.resource.data.items[0].sellerId == resource.data.items[0].sellerId;
+  allow delete: if false;
+}
+
+// Inventory
+match /inventory/{inventoryId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() 
+    && isSeller(request.auth.uid)
+    && request.resource.data.sellerId == request.auth.uid
+    && isValidInventory(request.resource.data);
+  allow update: if isAuthenticated()
+    && resource.data.sellerId == request.auth.uid
+    && isValidInventory(request.resource.data);
+  allow delete: if false;
+}
+
+// Disputes
+match /disputes/{disputeId} {
+  allow read: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.sellerId == request.auth.uid);
+  allow create: if isAuthenticated() 
+    && request.resource.data.buyerId == request.auth.uid
+    && exists(/databases/$(database)/documents/orders/$(request.resource.data.orderId))
+    && request.resource.data.status == 'open';
+  allow update: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.sellerId == request.auth.uid)
+    && request.resource.data.buyerId == resource.data.buyerId
+    && request.resource.data.sellerId == resource.data.sellerId
+    && request.resource.data.orderId == resource.data.orderId;
+  allow delete: if false;
+}
+
+// Transactions
+match /transactions/{transactionId} {
+  allow read: if isAuthenticated() 
+    && (resource.data.buyerId == request.auth.uid 
+        || resource.data.sellerId == request.auth.uid);
+  allow write: if false; // Only through server functions
+}
+
+// Analytics
+match /sellerAnalytics/{analyticsId} {
+  allow read: if isAuthenticated() && resource.data.sellerId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+match /marketStats/{statsId} {
+  allow read: if isAuthenticated();
+  allow write: if false; // Only through server functions
+}
+
+// User Profiles
+match /users/{userId} {
+  allow read: if isAuthenticated();
+  allow create: if isAuthenticated() && isOwner(userId);
+  allow update: if isAuthenticated() 
+    && isOwner(userId)
+    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['isSeller', 'sellerRating', 'totalSales', 'totalRevenue']) 
+        || (isSeller(userId) && isOwner(userId)));
+  allow delete: if false;
+}
+
+  }
+}

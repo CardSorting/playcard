@@ -1,0 +1,57 @@
+// Cart validation functions
+function isValidCartItem(item) {
+  return item.size() > 0
+    && item.quantity > 0
+    && item.price > 0
+    && exists(/databases/$(database)/documents/listings/$(item.listingId));
+}
+
+function hasValidCartItems(items) {
+  return items.size() > 0 && items.hasAll(['id', 'listingId', 'quantity', 'price', 'sellerId']);
+}
+
+// Carts collection
+match /carts/{cartId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow create: if isAuthenticated() 
+    && request.resource.data.userId == request.auth.uid
+    && (!request.resource.data.items || hasValidCartItems(request.resource.data.items));
+  allow update: if isAuthenticated() 
+    && resource.data.userId == request.auth.uid
+    && request.resource.data.userId == resource.data.userId
+    && (!request.resource.data.items || hasValidCartItems(request.resource.data.items));
+  allow delete: if false; // Carts are archived, not deleted
+}
+
+// Cart Analytics
+match /cartAnalytics/{analyticsId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Cart Recovery
+match /cartRecovery/{recoveryId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Cart Validation
+match /cartValidations/{validationId} {
+  allow read: if isAuthenticated() 
+    && get(/databases/$(database)/documents/carts/$(resource.data.cartId)).data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Cart Merges
+match /cartMerges/{mergeId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow write: if false; // Only through server functions
+}
+
+// Checkout Sessions
+match /checkoutSessions/{sessionId} {
+  allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow delete: if false;
+}

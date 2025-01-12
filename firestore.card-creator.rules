@@ -1,0 +1,54 @@
+// Card Creator helper functions
+function isCardOwner(cardId) {
+  return get(/databases/$(database)/documents/cardTemplates/$(cardId)).data.creatorId == request.auth.uid;
+}
+
+function isValidCard(card) {
+  return card.size() > 0 
+    && card.name.size() > 0 
+    && card.type.matches('^(Normal|Fire|Water|Electric|Grass|Ice|Fighting|Poison|Ground|Flying|Psychic|Bug|Rock|Ghost|Dragon|Dark|Steel|Fairy)$')
+    && card.creatorId == request.auth.uid;
+}
+
+// Card Templates collection
+match /cardTemplates/{cardId} {
+  allow read: if isAuthenticated() && (
+    resource.data.isPublic == true || 
+    resource.data.creatorId == request.auth.uid
+  );
+  allow create: if isAuthenticated() && isValidCard(request.resource.data);
+  allow update: if isAuthenticated() 
+    && resource.data.creatorId == request.auth.uid
+    && request.resource.data.creatorId == resource.data.creatorId;
+  allow delete: if isAuthenticated() && resource.data.creatorId == request.auth.uid;
+}
+
+// Card Analytics collection
+match /cardAnalytics/{analyticsId} {
+  allow read: if isAuthenticated() && isCardOwner(analyticsId);
+  allow update: if isAuthenticated() && (
+    // Allow incrementing view count
+    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views', 'updatedAt']) ||
+    // Allow full updates by owner
+    isCardOwner(analyticsId)
+  );
+  allow create, delete: if false;
+}
+
+// Card Versions collection
+match /cardVersions/{versionId} {
+  allow read: if isAuthenticated() && isCardOwner(resource.data.cardId);
+  allow create: if isAuthenticated() && isCardOwner(request.resource.data.cardId);
+  allow update, delete: if false;
+}
+
+// Card Collections collection
+match /cardCollections/{collectionId} {
+  allow read: if isAuthenticated() && (
+    resource.data.isPublic == true || 
+    resource.data.userId == request.auth.uid
+  );
+  allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+  allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+  allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+}

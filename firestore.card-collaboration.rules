@@ -1,0 +1,61 @@
+// Card Collaboration helper functions
+function isCollaborator(cardId) {
+  let collab = get(/databases/$(database)/documents/cardCollaborations/$(cardId));
+  return collab != null && (
+    collab.data.owner.userId == request.auth.uid ||
+    collab.data.collaborators[request.auth.uid] != null
+  );
+}
+
+function hasEditPermission(cardId) {
+  let collab = get(/databases/$(database)/documents/cardCollaborations/$(cardId));
+  return collab != null && (
+    collab.data.owner.userId == request.auth.uid ||
+    collab.data.collaborators[request.auth.uid].role == 'editor'
+  );
+}
+
+// Card Collaborations collection
+match /cardCollaborations/{collaborationId} {
+  allow read: if isAuthenticated() && isCollaborator(collaborationId);
+  allow create: if isAuthenticated() 
+    && request.resource.data.owner.userId == request.auth.uid;
+  allow update: if isAuthenticated() && (
+    // Owner can update everything
+    resource.data.owner.userId == request.auth.uid ||
+    // Editors can update activity log
+    (hasEditPermission(collaborationId) &&
+     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activity']))
+  );
+  allow delete: if isAuthenticated() 
+    && resource.data.owner.userId == request.auth.uid;
+}
+
+// Collaboration Activity collection
+match /collaborationActivity/{activityId} {
+  allow read: if isAuthenticated() 
+    && isCollaborator(resource.data.cardId);
+  allow create: if isAuthenticated() 
+    && isCollaborator(request.resource.data.cardId)
+    && request.resource.data.userId == request.auth.uid;
+  allow update, delete: if false;
+}
+
+// Collaboration Invites collection
+match /collaborationInvites/{inviteId} {
+  allow read: if isAuthenticated() && (
+    resource.data.inviterId == request.auth.uid ||
+    resource.data.inviteeEmail == request.auth.token.email
+  );
+  allow create: if isAuthenticated() 
+    && request.resource.data.inviterId == request.auth.uid
+    && isCardOwner(request.resource.data.cardId);
+  allow update: if isAuthenticated() && (
+    // Inviter can cancel
+    resource.data.inviterId == request.auth.uid ||
+    // Invitee can accept/reject
+    resource.data.inviteeEmail == request.auth.token.email
+  ) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt']);
+  allow delete: if isAuthenticated() 
+    && resource.data.inviterId == request.auth.uid;
+}

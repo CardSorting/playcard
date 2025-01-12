@@ -4,20 +4,24 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/use-toast";
 import { CardData } from "../card-creator/types";
 import CardPreview from "../card-creator/CardPreview";
 import { PackageIcon, Plus, X, Sparkles } from "lucide-react";
-
-interface BoosterPack {
-  id: string;
-  name: string;
-  cards: CardData[];
-  createdAt: number;
-}
+import { useAuth } from "@/lib/contexts/auth-context";
+import { 
+  createBoosterPack, 
+  getUserPacks, 
+  openBoosterPack,
+  togglePackFavorite 
+} from "@/lib/booster-packs";
+import type { BoosterPack } from "@/lib/booster-pack-schema";
 
 const CARDS_PER_PACK = 10;
 
 export default function BoosterPacks() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [cards, setCards] = useState<CardData[]>([]);
   const [packs, setPacks] = useState<BoosterPack[]>([]);
   const [selectedCards, setSelectedCards] = useState<CardData[]>([]);
@@ -26,44 +30,113 @@ export default function BoosterPacks() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const loadData = () => {
-      const storedCards = localStorage.getItem("pokemon-cards");
-      const storedPacks = localStorage.getItem("pokemon-booster-packs");
+    const loadData = async () => {
+      try {
+        // Load user's cards
+        const storedCards = localStorage.getItem("pokemon-cards");
+        if (storedCards) {
+          setCards(JSON.parse(storedCards));
+        }
 
-      if (storedCards) {
-        setCards(JSON.parse(storedCards));
+        // Load user's packs from Firebase
+        if (user) {
+          const userPacks = await getUserPacks(user.uid);
+          setPacks(userPacks);
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load your packs. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
       }
-      if (storedPacks) {
-        setPacks(JSON.parse(storedPacks));
-      }
-      setIsLoading(false);
     };
 
-    setTimeout(loadData, 100);
-  }, []);
+    loadData();
+  }, [user, toast]);
 
-  const savePacks = (newPacks: BoosterPack[]) => {
-    setPacks(newPacks);
-    localStorage.setItem("pokemon-booster-packs", JSON.stringify(newPacks));
+  const handleCreatePack = async () => {
+    if (!user || !packName || selectedCards.length !== CARDS_PER_PACK) return;
+
+    try {
+      const newPack = await createBoosterPack(user.uid, {
+        name: packName,
+        cards: selectedCards,
+        isPublic: true,
+      });
+
+      setPacks([newPack, ...packs]);
+      setPackName("");
+      setSelectedCards([]);
+
+      toast({
+        title: "Success",
+        description: "Your booster pack has been created!",
+      });
+    } catch (error) {
+      console.error("Error creating pack:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create pack. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const createPack = () => {
-    if (!packName || selectedCards.length !== CARDS_PER_PACK) return;
+  const handleOpenPack = async (pack: BoosterPack) => {
+    if (!user) return;
 
-    const newPack: BoosterPack = {
-      id: crypto.randomUUID(),
-      name: packName,
-      cards: selectedCards,
-      createdAt: Date.now(),
-    };
+    try {
+      const opening = await openBoosterPack(user.uid, pack.id);
+      setOpenedPack(pack);
 
-    savePacks([...packs, newPack]);
-    setPackName("");
-    setSelectedCards([]);
+      // Add cards to user's collection
+      const currentCards = JSON.parse(localStorage.getItem("pokemon-cards") || "[]");
+      localStorage.setItem(
+        "pokemon-cards",
+        JSON.stringify([...currentCards, ...opening.cards])
+      );
+
+      toast({
+        title: "Pack Opened!",
+        description: `You got ${opening.cards.length} new cards!`,
+      });
+    } catch (error) {
+      console.error("Error opening pack:", error);
+      toast({
+        title: "Error",
+        description: "Failed to open pack. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const deletePack = (packId: string) => {
-    savePacks(packs.filter((pack) => pack.id !== packId));
+  const handleToggleFavorite = async (pack: BoosterPack) => {
+    if (!user) return;
+
+    try {
+      const isFavorited = await togglePackFavorite(user.uid, pack.id);
+      setPacks(packs.map(p => 
+        p.id === pack.id 
+          ? { ...p, favoriteCount: p.favoriteCount + (isFavorited ? 1 : -1) }
+          : p
+      ));
+
+      toast({
+        title: isFavorited ? "Added to Favorites" : "Removed from Favorites",
+        description: `${pack.name} has been ${isFavorited ? "added to" : "removed from"} your favorites.`,
+      });
+    } catch (error) {
+      console.error("Error toggling favorite:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update favorites. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const toggleCardSelection = (card: CardData) => {
@@ -177,7 +250,7 @@ export default function BoosterPacks() {
               </div>
             </div>
             <Button
-              onClick={createPack}
+              onClick={handleCreatePack}
               disabled={!packName || selectedCards.length !== CARDS_PER_PACK}
               className="bg-yellow-400 hover:bg-yellow-500 text-black w-full"
             >
@@ -194,14 +267,6 @@ export default function BoosterPacks() {
               key={pack.id}
               className="p-6 bg-white/10 backdrop-blur-sm border-gray-800 relative group"
             >
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                onClick={() => deletePack(pack.id)}
-              >
-                <X className="w-4 h-4" />
-              </Button>
               <div className="flex items-center gap-4 mb-4">
                 <div className="p-3 rounded-full bg-yellow-400/10">
                   <PackageIcon className="w-6 h-6 text-yellow-400" />
@@ -211,17 +276,27 @@ export default function BoosterPacks() {
                     {pack.name}
                   </h3>
                   <p className="text-sm text-gray-400">
-                    {pack.cards.length} cards
+                    {pack.totalCards} cards • {pack.openCount} opens
                   </p>
                 </div>
               </div>
-              <Button
-                onClick={() => setOpenedPack(pack)}
-                className="w-full bg-white/5 hover:bg-white/10 text-white"
-              >
-                <Sparkles className="w-5 h-5 mr-2" />
-                Open Pack
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handleOpenPack(pack)}
+                  className="flex-1 bg-white/5 hover:bg-white/10 text-white"
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Open Pack
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="text-gray-400 hover:text-yellow-400 border-gray-700"
+                  onClick={() => handleToggleFavorite(pack)}
+                >
+                  <PackageIcon className="w-4 h-4" />
+                </Button>
+              </div>
             </Card>
           ))}
         </div>
