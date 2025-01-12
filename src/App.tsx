@@ -23,7 +23,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (user) {
-    return <Navigate to="/" />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -38,7 +38,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
@@ -46,7 +46,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Initialize Firebase component
 const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const initialize = async () => {
@@ -57,10 +57,14 @@ const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    if (user) {
+    if (!loading && user) {
       initialize();
     }
-  }, [user]);
+  }, [user, loading]);
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return <>{children}</>;
 };

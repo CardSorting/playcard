@@ -20,40 +20,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const navigate = useNavigate();
 
+  // Helper function to initialize user data
+  const initializeUserData = async (user: User) => {
+    try {
+      // Create or verify user document
+      const userRef = doc(db, 'users', user.uid);
+      const userDoc = await getDoc(userRef);
+      
+      if (!userDoc.exists()) {
+        await setDoc(userRef, {
+          email: user.email,
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+
+      // Create default collection if it doesn't exist
+      const defaultCollectionId = `default-${user.uid}`;
+      const collectionRef = doc(db, 'collections', defaultCollectionId);
+      const collectionDoc = await getDoc(collectionRef);
+
+      if (!collectionDoc.exists()) {
+        await setDoc(collectionRef, {
+          userId: user.uid,
+          name: 'My Collection',
+          description: 'Your default card collection',
+          isPublic: false,
+          totalCards: 0,
+          uniqueTypes: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      }
+    } catch (error) {
+      console.error('Error initializing user data:', error);
+    }
+  };
+
   useEffect(() => {
+    // Handle redirect result first
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          await initializeUserData(result.user);
+          setUser(result.user);
+          navigate('/');
+        }
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error('Error handling redirect result:', error);
+        setLoading(false);
+      });
+
+    // Set up auth state listener
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Create or update user document in Firestore
-        const userRef = doc(db, 'users', user.uid);
-        const userDoc = await getDoc(userRef);
-        
-        if (!userDoc.exists()) {
-          await setDoc(userRef, {
-            email: user.email,
-            displayName: user.displayName,
-            photoURL: user.photoURL,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          });
-        }
+        await initializeUserData(user);
       }
-      
       setUser(user);
       setLoading(false);
     });
-
-    // Handle redirect result
-    if (window.location.pathname === '/login') {
-      getRedirectResult(auth)
-        .then((result) => {
-          if (result?.user) {
-            navigate('/');
-          }
-        })
-        .catch((error) => {
-          console.error('Error handling redirect result:', error);
-        });
-    }
 
     return unsubscribe;
   }, [navigate]);

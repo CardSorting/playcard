@@ -16,6 +16,7 @@ import {
   runTransaction,
   DocumentReference,
   QueryConstraint,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import type {
@@ -197,6 +198,69 @@ export const getCollectionCards = async (
     };
   } = {}
 ): Promise<{ cards: CollectionCard[]; total: number }> => {
+  // First, ensure collection exists
+  const collectionRef = doc(db, 'collections', collectionId);
+  const collectionDoc = await getDoc(collectionRef);
+
+  if (!collectionDoc.exists()) {
+    // If it's a default collection, create it
+    if (collectionId.startsWith('default-')) {
+      const userId = collectionId.replace('default-', '');
+      // Create default collection
+      await setDoc(collectionRef, {
+        userId,
+        name: 'My Collection',
+        description: 'Your default card collection',
+        isPublic: false,
+        totalCards: 0,
+        uniqueTypes: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      // Initialize collection stats
+      const statsRef = doc(db, 'collectionStats', collectionId);
+      await setDoc(statsRef, {
+        collectionId,
+        cardCounts: {
+          total: 0,
+          byType: {},
+          byRarity: {},
+        },
+        activity: {
+          activityByDay: [],
+        },
+        value: {
+          totalEstimated: 0,
+          byRarity: {},
+          historicalValue: [],
+        },
+        updatedAt: Timestamp.now(),
+      });
+
+      // Initialize display settings
+      const displayRef = doc(db, 'collectionDisplay', collectionId);
+      await setDoc(displayRef, {
+        collectionId,
+        layout: {
+          viewMode: 'grid',
+          cardsPerRow: 4,
+          showDetails: true,
+          animations: true,
+        },
+        sort: {
+          field: 'date',
+          direction: 'desc',
+        },
+        filters: {},
+        sections: [],
+        updatedAt: Timestamp.now(),
+      });
+    } else {
+      throw new Error('Collection not found');
+    }
+  }
+
   const constraints: QueryConstraint[] = [
     where('collectionId', '==', collectionId),
   ];
@@ -355,9 +419,29 @@ export const updateDisplaySettings = async (
 
 // Get user's cards
 export const getUserCards = async (userId: string): Promise<CardData[]> => {
+  // First, ensure user has a default collection
+  const defaultCollectionId = `default-${userId}`;
+  const collectionRef = doc(db, 'collections', defaultCollectionId);
+  const collectionDoc = await getDoc(collectionRef);
+
+  if (!collectionDoc.exists()) {
+    // Create default collection if it doesn't exist
+    await setDoc(collectionRef, {
+      userId,
+      name: 'My Collection',
+      description: 'Your default card collection',
+      isPublic: false,
+      totalCards: 0,
+      uniqueTypes: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+  }
+
+  // Query cards from the default collection
   const q = query(
     firestoreCollection(db, 'collectionCards'),
-    where('userId', '==', userId),
+    where('collectionId', '==', defaultCollectionId),
     orderBy('addedAt', 'desc')
   );
   

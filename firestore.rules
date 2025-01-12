@@ -111,27 +111,30 @@ service cloud.firestore {
   );
 }
 
+    // Collection helper functions
     function isCollectionOwner(collectionId) {
-  return get(/databases/$(database)/documents/collections/$(collectionId)).data.userId == request.auth.uid;
-}
+      return exists(/databases/$(database)/documents/collections/$(collectionId)) &&
+             get(/databases/$(database)/documents/collections/$(collectionId)).data.userId == request.auth.uid;
+    }
 
     function isCollectionCollaborator(collectionId) {
-  let sharing = get(/databases/$(database)/documents/collectionSharing/$(collectionId));
-  return sharing != null && sharing.data.collaborators[request.auth.uid] != null;
-}
+      return exists(/databases/$(database)/documents/collectionSharing/$(collectionId)) &&
+             get(/databases/$(database)/documents/collectionSharing/$(collectionId)).data.collaborators[request.auth.uid] != null;
+    }
 
     function hasCollectionEditAccess(collectionId) {
-  let sharing = get(/databases/$(database)/documents/collectionSharing/$(collectionId));
-  return sharing != null && sharing.data.collaborators[request.auth.uid].role == 'editor';
-}
+      return exists(/databases/$(database)/documents/collectionSharing/$(collectionId)) &&
+             get(/databases/$(database)/documents/collectionSharing/$(collectionId)).data.collaborators[request.auth.uid].role == 'editor';
+    }
 
     function isValidCollectionCard(card) {
-  return card.size() > 0
-    && card.cardId.size() > 0
-    && card.snapshot.size() > 0
-    && card.snapshot.name.size() > 0
-    && card.snapshot.type.matches('^(Normal|Fire|Water|Electric|Grass|Ice|Fighting|Poison|Ground|Flying|Psychic|Bug|Rock|Ghost|Dragon|Dark|Steel|Fairy)$');
-}
+      return card.size() > 0
+        && card.cardId.size() > 0
+        && card.snapshot.size() > 0
+        && card.snapshot.name.size() > 0
+        && card.snapshot.type.matches('^(Normal|Fire|Water|Electric|Grass|Ice|Fighting|Poison|Ground|Flying|Psychic|Bug|Rock|Ghost|Dragon|Dark|Steel|Fairy)$');
+    }
+
 
     function isValidPack(pack) {
   return pack.size() > 0
@@ -176,10 +179,15 @@ service cloud.firestore {
   );
 }
 
+
+    function isDefaultCollection(collectionId) {
+      return collectionId.matches('^default-' + request.auth.uid + '$');
+    }
+
     function isPackAnalyticsOwner(packId) {
-  let pack = get(/databases/$(database)/documents/boosterPacks/$(packId));
-  return pack != null && pack.data.userId == request.auth.uid;
-}
+      let pack = get(/databases/$(database)/documents/boosterPacks/$(packId));
+      return pack != null && pack.data.userId == request.auth.uid;
+    }
 
     // Base user rules
     match /users/{userId} {
@@ -451,94 +459,136 @@ match /collaborationInvites/{inviteId} {
 }
 
     // collection rules
-match /collections/{collectionId} {
-  allow read: if isAuthenticated() && (
-    resource.data.isPublic == true || 
-    isCollectionOwner(collectionId) ||
-    isCollectionCollaborator(collectionId)
-  );
-  allow create: if isAuthenticated() 
-    && request.resource.data.userId == request.auth.uid;
-  allow update: if isAuthenticated() && (
-    isCollectionOwner(collectionId) ||
-    hasCollectionEditAccess(collectionId)
-  );
-  allow delete: if isAuthenticated() && isCollectionOwner(collectionId);
-}
-match /collectionCards/{cardId} {
-  allow read: if isAuthenticated() && (
-    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
-    isCollectionOwner(resource.data.collectionId) ||
-    isCollectionCollaborator(resource.data.collectionId)
-  );
-  allow create: if isAuthenticated() 
-    && isCollectionOwner(request.resource.data.collectionId)
-    && isValidCollectionCard(request.resource.data);
-  allow update: if isAuthenticated() && (
-    isCollectionOwner(resource.data.collectionId) ||
-    hasCollectionEditAccess(resource.data.collectionId)
-  );
-  allow delete: if isAuthenticated() && isCollectionOwner(resource.data.collectionId);
-}
-match /collectionStats/{statsId} {
-  allow read: if isAuthenticated() && (
-    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
-    isCollectionOwner(resource.data.collectionId) ||
-    isCollectionCollaborator(resource.data.collectionId)
-  );
-  allow write: if false; // Only through functions
-}
-match /collectionSharing/{sharingId} {
-  allow read: if isAuthenticated() && (
-    isCollectionOwner(sharingId) ||
-    resource.data.collaborators[request.auth.uid] != null ||
-    (resource.data.visibility == 'link' && request.auth.token.email == resource.data.shareLink.allowedEmail)
-  );
-  allow create: if isAuthenticated() && isCollectionOwner(request.resource.data.collectionId);
-  allow update: if isAuthenticated() && (
-    isCollectionOwner(resource.data.collectionId) ||
-    (resource.data.collaborators[request.auth.uid].role == 'editor' &&
-     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accessLog']))
-  );
-  allow delete: if isAuthenticated() && isCollectionOwner(resource.data.collectionId);
-}
-match /collectionAchievements/{achievementId} {
-  allow read: if isAuthenticated() && (
-    resource.data.userId == request.auth.uid ||
-    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true
-  );
-  allow write: if false; // Only through functions
-}
-match /collectionTrades/{tradeId} {
-  allow read: if isAuthenticated() && (
-    resource.data.initiatorId == request.auth.uid ||
-    resource.data.recipientId == request.auth.uid
-  );
-  allow create: if isAuthenticated() 
-    && request.resource.data.initiatorId == request.auth.uid
-    && request.resource.data.offer.size() == 2;
-  allow update: if isAuthenticated() && (
-    resource.data.initiatorId == request.auth.uid ||
-    resource.data.recipientId == request.auth.uid
-  ) && (
-    // Only allow updating specific fields
-    request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'offer', 'messages', 'verification', 'updatedAt']) ||
-    // Or completing the trade
-    (request.resource.data.status == 'completed' && resource.data.verification.initiatorConfirmed && resource.data.verification.recipientConfirmed)
-  );
-  allow delete: if false; // Trades are archived, not deleted
-}
-match /collectionDisplay/{displayId} {
-  allow read: if isAuthenticated() && (
-    get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
-    isCollectionOwner(resource.data.collectionId) ||
-    isCollectionCollaborator(resource.data.collectionId)
-  );
-  allow write: if isAuthenticated() && (
-    isCollectionOwner(resource.data.collectionId) ||
-    hasCollectionEditAccess(resource.data.collectionId)
-  );
-}
+    match /collections/{collectionId} {
+      allow read: if isAuthenticated() && (
+        resource.data.isPublic == true || 
+        isCollectionOwner(collectionId) ||
+        isCollectionCollaborator(collectionId) ||
+        isDefaultCollection(collectionId)
+      );
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        isDefaultCollection(collectionId)
+      );
+      allow update: if isAuthenticated() && (
+        isCollectionOwner(collectionId) ||
+        hasCollectionEditAccess(collectionId)
+      );
+      allow delete: if isAuthenticated() && isCollectionOwner(collectionId);
+    }
+    match /collectionCards/{cardId} {
+      allow read: if isAuthenticated() && (
+        exists(/databases/$(database)/documents/collections/$(resource.data.collectionId)) &&
+        (
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId == request.auth.uid ||
+          isCollectionCollaborator(resource.data.collectionId) ||
+          isDefaultCollection(resource.data.collectionId)
+        )
+      );
+      allow create: if isAuthenticated() && 
+        (isCollectionOwner(request.resource.data.collectionId) ||
+         isDefaultCollection(request.resource.data.collectionId)) && 
+        isValidCollectionCard(request.resource.data);
+      allow update: if isAuthenticated() && (
+        isCollectionOwner(resource.data.collectionId) ||
+        hasCollectionEditAccess(resource.data.collectionId) ||
+        isDefaultCollection(resource.data.collectionId)
+      );
+      allow delete: if isAuthenticated() && (
+        isCollectionOwner(resource.data.collectionId) ||
+        isDefaultCollection(resource.data.collectionId)
+      );
+    }
+    match /collectionStats/{statsId} {
+      allow read: if isAuthenticated() && (
+        exists(/databases/$(database)/documents/collections/$(resource.data.collectionId)) &&
+        (
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId == request.auth.uid ||
+          isCollectionCollaborator(resource.data.collectionId) ||
+          isDefaultCollection(resource.data.collectionId)
+        )
+      );
+      allow write: if false; // Only through functions
+    }
+    match /collectionSharing/{sharingId} {
+      allow read: if isAuthenticated() && (
+        isCollectionOwner(sharingId) ||
+        resource.data.collaborators[request.auth.uid] != null ||
+        (resource.data.visibility == 'link' && request.auth.token.email == resource.data.shareLink.allowedEmail) ||
+        isDefaultCollection(sharingId)
+      );
+      allow create: if isAuthenticated() && (
+        isCollectionOwner(request.resource.data.collectionId) ||
+        isDefaultCollection(request.resource.data.collectionId)
+      );
+      allow update: if isAuthenticated() && (
+        isCollectionOwner(resource.data.collectionId) ||
+        (resource.data.collaborators[request.auth.uid].role == 'editor' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['accessLog'])) ||
+        isDefaultCollection(resource.data.collectionId)
+      );
+      allow delete: if isAuthenticated() && (
+        isCollectionOwner(resource.data.collectionId) ||
+        isDefaultCollection(resource.data.collectionId)
+      );
+    }
+    match /collectionAchievements/{achievementId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        (exists(/databases/$(database)/documents/collections/$(resource.data.collectionId)) &&
+        (
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId == request.auth.uid ||
+          isCollectionCollaborator(resource.data.collectionId) ||
+          isDefaultCollection(resource.data.collectionId)
+        ))
+      );
+      allow write: if false; // Only through functions
+    }
+    match /collectionTrades/{tradeId} {
+      allow read: if isAuthenticated() && (
+        resource.data.initiatorId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid
+      );
+      allow create: if isAuthenticated() && 
+        request.resource.data.initiatorId == request.auth.uid &&
+        request.resource.data.offer.size() == 2 &&
+        // Verify collection ownership for traded cards
+        request.resource.data.offer[0].cards.size() > 0 &&
+        request.resource.data.offer[0].cards.hasAll(['collectionId']) &&
+        (isCollectionOwner(request.resource.data.offer[0].cards[0].collectionId) ||
+         isDefaultCollection(request.resource.data.offer[0].cards[0].collectionId));
+      allow update: if isAuthenticated() && (
+        resource.data.initiatorId == request.auth.uid ||
+        resource.data.recipientId == request.auth.uid
+      ) && (
+        // Only allow updating specific fields
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'offer', 'messages', 'verification', 'updatedAt']) ||
+        // Or completing the trade
+        (request.resource.data.status == 'completed' && 
+         resource.data.verification.initiatorConfirmed && 
+         resource.data.verification.recipientConfirmed)
+      );
+      allow delete: if false; // Trades are archived, not deleted
+    }
+    match /collectionDisplay/{displayId} {
+      allow read: if isAuthenticated() && (
+        exists(/databases/$(database)/documents/collections/$(resource.data.collectionId)) &&
+        (
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.isPublic == true ||
+          get(/databases/$(database)/documents/collections/$(resource.data.collectionId)).data.userId == request.auth.uid ||
+          isCollectionCollaborator(resource.data.collectionId) ||
+          isDefaultCollection(resource.data.collectionId)
+        )
+      );
+      allow write: if isAuthenticated() && (
+        isCollectionOwner(resource.data.collectionId) ||
+        hasCollectionEditAccess(resource.data.collectionId) ||
+        isDefaultCollection(resource.data.collectionId)
+      );
+    }
 
     // booster-packs rules
 match /boosterPacks/{packId} {

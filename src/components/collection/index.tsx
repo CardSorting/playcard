@@ -33,11 +33,31 @@ export default function Collection() {
       }
 
       try {
-        const result = await getCollectionCards(user.uid, {
-          page: currentPage,
-          limit: CARDS_PER_PAGE,
-          sort: { field: "date", direction: "desc" },
-        });
+        const defaultCollectionId = `default-${user.uid}`;
+        // Add retry logic for race conditions with exponential backoff
+        let retries = 3;
+        let result;
+        let delay = 1000;
+        
+        while (retries > 0) {
+          try {
+            result = await getCollectionCards(defaultCollectionId, {
+              page: currentPage,
+              limit: CARDS_PER_PAGE,
+              sort: { field: "date", direction: "desc" },
+            });
+            break;
+          } catch (error) {
+            console.error(`Attempt failed (${retries} retries left):`, error);
+            if (retries === 1) throw error;
+            retries--;
+            // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, delay));
+            delay *= 2;
+          }
+        }
+
+        if (!result) throw new Error("Failed to load cards after all retries");
 
         setCards(
           result.cards.map((card) => ({

@@ -1,5 +1,5 @@
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, auth } from './firebase';
 
 // Define collection names as constants
 export const COLLECTIONS = {
@@ -10,10 +10,29 @@ export const COLLECTIONS = {
   COLLECTIONS: 'collections'
 } as const;
 
-// Initialize Firestore (no-op for now since we don't need metadata documents)
+// Initialize Firestore and verify authentication
 export const initializeFirestore = async () => {
   try {
-    // Collections will be created automatically when documents are added
+    // Verify user document exists
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('No authenticated user found');
+    }
+
+    const userRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userRef);
+    
+    if (!userDoc.exists()) {
+      // Create user document if it doesn't exist
+      await setDoc(userRef, {
+        email: user.email,
+        displayName: user.displayName,
+        photoURL: user.photoURL,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
     console.log('Firestore initialized successfully');
   } catch (error) {
     console.error('Error initializing Firestore:', error);
