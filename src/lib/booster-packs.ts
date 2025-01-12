@@ -13,7 +13,9 @@ import {
   runTransaction,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import type { BoosterPack, PackOpening, PackAnalytics } from './booster-pack-schema';
+import type { BoosterPack, BoosterPackStats } from './booster-pack-schema';
+import type { ClaimPool } from './claim-schema';
+import { createClaimPool, claimFromPool, getClaimPool } from './claims';
 import type { CardData } from '@/components/card-creator/types';
 
 // Create new booster pack
@@ -37,6 +39,16 @@ export const createBoosterPack = async (
     return acc;
   }, {} as Record<string, number>);
 
+  // Calculate tier based on rarity distribution
+  const calculateTier = (rarityDistribution: Record<string, number>) => {
+    const hasUltraRare = rarityDistribution['Ultra Rare'] > 0 || rarityDistribution['Secret Rare'] > 0;
+    const hasRare = rarityDistribution['Rare'] > 0;
+    return hasUltraRare ? 'ultra_rare' : hasRare ? 'rare' : 'common';
+  };
+
+  const tier = calculateTier(rarityDistribution);
+
+  // Create the booster pack
   const packData: Omit<BoosterPack, 'id'> = {
     userId,
     name: data.name,
@@ -53,16 +65,36 @@ export const createBoosterPack = async (
     updatedAt: Timestamp.now(),
   };
 
+  // Create booster pack
   const packRef = await addDoc(collection(db, 'boosterPacks'), packData);
 
-  // Initialize analytics
-  await addDoc(collection(db, 'packAnalytics'), {
-    packId: packRef.id,
-    dailyStats: [],
-    pullRates: {},
-    rarityStats: {},
-    lastUpdated: Timestamp.now(),
+  // Create claim pool for the pack
+  const claimLimits = {
+    ultra_rare: { total: 10, perUser: 1 },
+    rare: { total: 50, perUser: 2 },
+    common: { total: 100, perUser: 3 },
+  };
+
+  const { total, perUser } = claimLimits[tier];
+  const claimPool = await createClaimPool(packRef.id, 'booster_pack', {
+    totalLimit: total,
+    perUserLimit: perUser,
+    tier,
   });
+
+  // Update pack with claim pool reference and initialize stats
+  await Promise.all([
+    updateDoc(packRef, {
+      claimPoolId: claimPool.id,
+    }),
+    addDoc(collection(db, 'boosterPackStats'), {
+      packId: packRef.id,
+      mostOpenedCards: [],
+      rarityStats: {},
+      opensByDay: [],
+      updatedAt: Timestamp.now(),
+    })
+  ]);
 
   return { id: packRef.id, ...packData };
 };
@@ -94,7 +126,7 @@ export const getPublicPacks = async () => {
 export const openBoosterPack = async (
   userId: string,
   packId: string
-): Promise<PackOpening> => {
+): Promise<{ cards: CardData[] }> => {
   return runTransaction(db, async (transaction) => {
     const packRef = doc(db, 'boosterPacks', packId);
     const packDoc = await transaction.get(packRef);
@@ -105,26 +137,13 @@ export const openBoosterPack = async (
 
     const pack = packDoc.data() as BoosterPack;
     
-    // Create opening record
-    const openingData: Omit<PackOpening, 'id'> = {
-      packId,
-      userId,
-      cards: pack.cards,
-      pulledRarities: pack.cards.reduce((acc, card) => {
-        const rarity = card.rarity || 'Common';
-        acc[rarity] = (acc[rarity] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      bestPull: pack.cards.reduce((best, card) => {
-        const rarityValue = getRarityValue(card.rarity || 'Common');
-        const bestValue = best ? getRarityValue(best.rarity) : -1;
-        return rarityValue > bestValue ? { cardId: card.id, rarity: card.rarity || 'Common' } : best;
-      }, undefined as PackOpening['bestPull']),
-      createdAt: Timestamp.now(),
-    };
+    if (!pack.claimPoolId) {
+      throw new Error('Pack is not available for claiming');
+    }
 
-    const openingRef = await addDoc(collection(db, 'packOpenings'), openingData);
-
+    // Claim from pool first
+    await claimFromPool(pack.claimPoolId, userId);
+    
     // Update pack stats
     transaction.update(packRef, {
       openCount: increment(1),
@@ -132,44 +151,43 @@ export const openBoosterPack = async (
       updatedAt: Timestamp.now(),
     });
 
-    // Update analytics
-    const analyticsRef = doc(collection(db, 'packAnalytics'), packId);
-    const analyticsDoc = await transaction.get(analyticsRef);
-    const analytics = analyticsDoc.data() as PackAnalytics;
+    // Update pack stats
+    const statsRef = doc(collection(db, 'boosterPackStats'), packId);
+    const statsDoc = await transaction.get(statsRef);
+    const stats = statsDoc.data() as BoosterPackStats;
 
     const today = new Date().toISOString().split('T')[0];
-    const todayStats = analytics.dailyStats.find(stat => stat.date === today);
+    const todayStats = stats.opensByDay.find(day => day.date === today);
 
     if (todayStats) {
-      todayStats.opens++;
+      todayStats.count++;
     } else {
-      analytics.dailyStats.push({
+      stats.opensByDay.push({
         date: today,
-        opens: 1,
-        favorites: 0,
+        count: 1,
       });
     }
 
-    // Update pull rates
+    // Update card stats
     pack.cards.forEach(card => {
-      const cardStats = analytics.pullRates[card.id] || { pulls: 0, totalOpens: 0 };
-      cardStats.pulls++;
-      cardStats.totalOpens++;
-      analytics.pullRates[card.id] = cardStats;
-
       const rarity = card.rarity || 'Common';
-      const rarityStats = analytics.rarityStats[rarity] || { pulls: 0, totalOpens: 0 };
-      rarityStats.pulls++;
-      rarityStats.totalOpens++;
-      analytics.rarityStats[rarity] = rarityStats;
+      if (!stats.rarityStats[rarity]) {
+        stats.rarityStats[rarity] = {
+          totalOpened: 0,
+          averagePerOpening: 0,
+        };
+      }
+      stats.rarityStats[rarity].totalOpened++;
+      stats.rarityStats[rarity].averagePerOpening = 
+        stats.rarityStats[rarity].totalOpened / stats.opensByDay.reduce((sum, day) => sum + day.count, 0);
     });
 
-    transaction.set(analyticsRef, {
-      ...analytics,
-      lastUpdated: Timestamp.now(),
+    transaction.update(statsRef, {
+      ...stats,
+      updatedAt: Timestamp.now(),
     });
 
-    return { id: openingRef.id, ...openingData };
+    return { cards: pack.cards };
   });
 };
 
@@ -196,27 +214,26 @@ export const togglePackFavorite = async (
         favoriteCount: increment(1),
       });
 
-      // Update analytics
-      const analyticsRef = doc(collection(db, 'packAnalytics'), packId);
-      const analyticsDoc = await transaction.get(analyticsRef);
-      const analytics = analyticsDoc.data() as PackAnalytics;
+      // Update pack stats
+      const statsRef = doc(collection(db, 'boosterPackStats'), packId);
+      const statsDoc = await transaction.get(statsRef);
+      const stats = statsDoc.data() as BoosterPackStats;
 
       const today = new Date().toISOString().split('T')[0];
-      const todayStats = analytics.dailyStats.find(stat => stat.date === today);
+      const todayStats = stats.opensByDay.find(day => day.date === today);
 
       if (todayStats) {
-        todayStats.favorites++;
+        todayStats.count++;
       } else {
-        analytics.dailyStats.push({
+        stats.opensByDay.push({
           date: today,
-          opens: 0,
-          favorites: 1,
+          count: 1,
         });
       }
 
-      transaction.set(analyticsRef, {
-        ...analytics,
-        lastUpdated: Timestamp.now(),
+      transaction.update(statsRef, {
+        ...stats,
+        updatedAt: Timestamp.now(),
       });
     });
     return true;

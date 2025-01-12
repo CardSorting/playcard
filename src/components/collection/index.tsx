@@ -6,6 +6,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import CardPreview from "../card-creator/CardPreview";
 import { PlusIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { CardData } from "../card-creator/types";
+import { useAuth } from "@/lib/contexts/auth-context";
+import { getCollectionCards } from "@/lib/collection";
+import { useToast } from "@/components/ui/use-toast";
 
 const CARDS_PER_PAGE = 8;
 
@@ -13,24 +16,55 @@ export default function Collection() {
   const [cards, setCards] = useState<CardData[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [totalCards, setTotalCards] = useState(0);
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
-    const loadCards = () => {
-      const storedCards = localStorage.getItem("pokemon-cards");
-      if (storedCards) {
-        setCards(JSON.parse(storedCards));
+    const loadCards = async () => {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to view your collection.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
+
+      try {
+        const result = await getCollectionCards(user.uid, {
+          page: currentPage,
+          limit: CARDS_PER_PAGE,
+          sort: { field: "date", direction: "desc" },
+        });
+
+        setCards(
+          result.cards.map((card) => ({
+            id: card.id,
+            name: card.snapshot.name,
+            type: card.snapshot.type,
+            image: card.snapshot.imageUrl,
+            rarity: card.snapshot.rarity as CardData['rarity'],
+          }))
+        );
+        setTotalCards(result.total);
+        setIsLoading(false);
+      } catch (error) {
+        console.error("Error loading cards:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load your collection. Please try again.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
+      }
     };
 
-    // Small delay to ensure localStorage is ready
-    setTimeout(loadCards, 100);
-  }, []);
+    loadCards();
+  }, [user, currentPage, toast]);
 
-  const totalPages = Math.ceil(cards.length / CARDS_PER_PAGE);
-  const startIndex = (currentPage - 1) * CARDS_PER_PAGE;
-  const endIndex = startIndex + CARDS_PER_PAGE;
-  const currentCards = cards.slice(startIndex, endIndex);
+  const totalPages = Math.ceil(totalCards / CARDS_PER_PAGE);
 
   if (isLoading) {
     return (
@@ -90,7 +124,7 @@ export default function Collection() {
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
-              {currentCards.map((card, index) => (
+              {cards.map((card, index) => (
                 <div
                   key={`${card.name}-${index}`}
                   className="transform hover:scale-105 transition-all duration-300"

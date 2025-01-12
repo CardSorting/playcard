@@ -28,7 +28,7 @@ import type {
   CollectionTrade,
   CollectionDisplay
 } from './collection-schema';
-import { PokemonType } from '@/components/card-creator/types';
+import { PokemonType, CardData } from '@/components/card-creator/types';
 
 const POKEMON_TYPES = [
   'Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 'Fighting',
@@ -350,5 +350,26 @@ export const updateDisplaySettings = async (
   await updateDoc(displayRef, {
     ...settings,
     updatedAt: Timestamp.now(),
+  });
+};
+
+// Get user's cards
+export const getUserCards = async (userId: string): Promise<CardData[]> => {
+  const q = query(
+    firestoreCollection(db, 'collectionCards'),
+    where('userId', '==', userId),
+    orderBy('addedAt', 'desc')
+  );
+  
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.snapshot.name,
+      type: data.snapshot.type,
+      image: data.snapshot.imageUrl,
+      rarity: data.snapshot.rarity,
+    };
   });
 };

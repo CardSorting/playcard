@@ -3,6 +3,11 @@ import { AuthProvider, useAuth } from './lib/contexts/auth-context';
 import { useEffect } from 'react';
 import { initializeFirestore } from './lib/initFirestore';
 import Home from './components/home';
+import BoosterPacks from './components/booster-packs';
+import Collection from './components/collection';
+import ImageGenerator from './components/image-generator';
+import Marketplace from './components/marketplace';
+import Claims from './components/claims';
 import { Toaster } from './components/ui/toaster';
 
 // Protected route wrapper component
@@ -53,7 +58,31 @@ function App() {
                 <Home />
               </ProtectedRoute>
             } />
-            {/* Add more routes as needed */}
+            <Route path="/booster-packs" element={
+              <ProtectedRoute>
+                <BoosterPacks />
+              </ProtectedRoute>
+            } />
+            <Route path="/collection" element={
+              <ProtectedRoute>
+                <Collection />
+              </ProtectedRoute>
+            } />
+            <Route path="/image-generator" element={
+              <ProtectedRoute>
+                <ImageGenerator />
+              </ProtectedRoute>
+            } />
+            <Route path="/marketplace/*" element={
+              <ProtectedRoute>
+                <Marketplace />
+              </ProtectedRoute>
+            } />
+            <Route path="/claims" element={
+              <ProtectedRoute>
+                <Claims />
+              </ProtectedRoute>
+            } />
           </Routes>
           <Toaster />
         </Router>

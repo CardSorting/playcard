@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { CardData } from "./types";
+import { useAuth } from "@/lib/contexts/auth-context";
+import { createCard } from "@/lib/card-creator";
+import { useToast } from "@/components/ui/use-toast";
 import CardForm from "./CardForm";
 import CardPreview from "./CardPreview";
 import ImageUploader from "./ImageUploader";
@@ -14,24 +17,47 @@ export default function CardCreator() {
     type: "Normal",
   });
 
-  // Save card to local storage when it's complete
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  // Save card to Firebase when it's complete
   useEffect(() => {
-    if (cardData.name && cardData.image && cardData.type) {
-      const cards = JSON.parse(localStorage.getItem("pokemon-cards") || "[]");
-      const cardExists = cards.some(
-        (card) =>
-          card.name === cardData.name &&
-          card.image === cardData.image &&
-          card.type === cardData.type,
-      );
-      if (!cardExists) {
-        localStorage.setItem(
-          "pokemon-cards",
-          JSON.stringify([...cards, cardData]),
-        );
+    const saveCard = async () => {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to save your card.",
+          variant: "destructive",
+        });
+        return;
       }
-    }
-  }, [cardData]);
+
+      if (cardData.name && cardData.image && cardData.type) {
+        try {
+          await createCard(user.uid, user.displayName || "Anonymous", {
+            name: cardData.name,
+            type: cardData.type,
+            imageUrl: cardData.image,
+            isPublic: false, // Default to private
+          });
+
+          toast({
+            title: "Card Saved",
+            description: "Your card has been saved successfully.",
+          });
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Failed to save your card. Please try again.",
+            variant: "destructive",
+          });
+          console.error("Error saving card:", error);
+        }
+      }
+    };
+
+    saveCard();
+  }, [cardData, user, toast]);
 
   const [showPreview, setShowPreview] = useState(false);
 

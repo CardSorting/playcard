@@ -4,6 +4,7 @@ import { CardData } from '@/components/card-creator/types';
 export interface BoosterPack {
   id: string;
   userId: string;
+  creatorName?: string;
   name: string;
   description?: string;
   cards: CardData[];
@@ -26,109 +27,37 @@ export interface BoosterPack {
   updatedAt: Timestamp;
   publishedAt?: Timestamp;
   lastOpenedAt?: Timestamp;
+  // Reference to claim pool
+  claimPoolId?: string;
 }
 
-export interface PackOpening {
+export interface BoosterPackStats {
   id: string;
   packId: string;
-  userId: string;
-  cards: CardData[];
-  // Opening details
-  pulledRarities: {
-    [key: string]: number;
-  };
-  bestPull?: {
+  // Card stats
+  mostOpenedCards: {
     cardId: string;
-    rarity: string;
-  };
-  // Metadata
-  createdAt: Timestamp;
-}
-
-export interface PackFavorite {
-  id: string;
-  packId: string;
-  userId: string;
-  createdAt: Timestamp;
-}
-
-export interface PackAnalytics {
-  id: string;
-  packId: string;
-  // Daily stats
-  dailyStats: {
-    date: string;
-    opens: number;
-    favorites: number;
+    openCount: number;
   }[];
-  // Card pull rates
-  pullRates: {
-    [cardId: string]: {
-      pulls: number;
-      totalOpens: number;
-    };
-  };
   // Rarity stats
   rarityStats: {
     [rarity: string]: {
-      pulls: number;
-      totalOpens: number;
+      totalOpened: number;
+      averagePerOpening: number;
     };
   };
-  // Metadata
-  lastUpdated: Timestamp;
-}
-
-export interface PackCollection {
-  id: string;
-  userId: string;
-  name: string;
-  description?: string;
-  // Collection contents
-  packs: {
-    packId: string;
-    addedAt: Timestamp;
-    openCount: number;
-    lastOpenedAt?: Timestamp;
+  // Time-based stats
+  opensByDay: {
+    date: string;
+    count: number;
   }[];
-  // Collection settings
-  isPublic: boolean;
-  sortOrder: 'name' | 'added' | 'opened' | 'custom';
-  // Stats
-  totalPacks: number;
-  totalOpens: number;
   // Metadata
-  createdAt: Timestamp;
   updatedAt: Timestamp;
 }
 
-export interface PackTemplate {
+export interface BoosterPackFavorite {
   id: string;
+  packId: string;
   userId: string;
-  name: string;
-  description?: string;
-  // Template rules
-  cardCount: number;
-  rarityRules: {
-    [rarity: string]: {
-      min: number;
-      max: number;
-      guaranteed?: boolean;
-    };
-  };
-  typeRules?: {
-    [type: string]: {
-      min: number;
-      max: number;
-      guaranteed?: boolean;
-    };
-  };
-  // Template status
-  isActive: boolean;
-  // Usage stats
-  usageCount: number;
-  lastUsed?: Timestamp;
-  // Metadata
   createdAt: Timestamp;
-  updatedAt: Timestamp;
 }

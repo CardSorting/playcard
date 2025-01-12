@@ -5,15 +5,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CardData } from "../card-creator/types";
+import { addCardToCollection, getUserCards } from "@/lib/collection";
 import CardPreview from "../card-creator/CardPreview";
 import { PackageIcon, Plus, X, Sparkles } from "lucide-react";
+import { getClaimPool } from "@/lib/claims";
+import type { ClaimPool } from "@/lib/claim-schema";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { 
   createBoosterPack, 
   getUserPacks, 
   openBoosterPack,
-  togglePackFavorite 
+  togglePackFavorite,
+  getPublicPacks
 } from "@/lib/booster-packs";
 import type { BoosterPack } from "@/lib/booster-pack-schema";
 
@@ -23,7 +28,11 @@ export default function BoosterPacks() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [cards, setCards] = useState<CardData[]>([]);
-  const [packs, setPacks] = useState<BoosterPack[]>([]);
+  interface PackWithClaims extends BoosterPack {
+    claimPool?: ClaimPool;
+  }
+  
+  const [packs, setPacks] = useState<PackWithClaims[]>([]);
   const [selectedCards, setSelectedCards] = useState<CardData[]>([]);
   const [packName, setPackName] = useState("");
   const [openedPack, setOpenedPack] = useState<BoosterPack | null>(null);
@@ -32,22 +41,32 @@ export default function BoosterPacks() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        // Load user's cards
-        const storedCards = localStorage.getItem("pokemon-cards");
-        if (storedCards) {
-          setCards(JSON.parse(storedCards));
+        if (!user) {
+          setIsLoading(false);
+          return;
         }
 
-        // Load user's packs from Firebase
-        if (user) {
-          const userPacks = await getUserPacks(user.uid);
-          setPacks(userPacks);
-        }
+        // Load user's cards from collection
+        const userCards = await getUserCards(user.uid);
+        setCards(userCards);
+
+        // Load all public packs and their claim pools
+        const publicPacks = await getPublicPacks();
+        const packsWithClaims = await Promise.all(
+          publicPacks.map(async (pack) => {
+            if (pack.claimPoolId) {
+              const claimPool = await getClaimPool(pack.claimPoolId);
+              return { ...pack, claimPool: claimPool || undefined };
+            }
+            return pack;
+          })
+        );
+        setPacks(packsWithClaims);
       } catch (error) {
         console.error("Error loading data:", error);
         toast({
           title: "Error",
-          description: "Failed to load your packs. Please try again.",
+          description: "Failed to load packs. Please try again.",
           variant: "destructive",
         });
       } finally {
@@ -57,6 +76,53 @@ export default function BoosterPacks() {
 
     loadData();
   }, [user, toast]);
+
+  const loadUserPacks = async () => {
+    if (!user) return;
+    try {
+      const userPacks = await getUserPacks(user.uid);
+      const packsWithClaims = await Promise.all(
+        userPacks.map(async (pack) => {
+          if (pack.claimPoolId) {
+            const claimPool = await getClaimPool(pack.claimPoolId);
+            return { ...pack, claimPool: claimPool || undefined };
+          }
+          return pack;
+        })
+      );
+      setPacks(packsWithClaims);
+    } catch (error) {
+      console.error("Error loading user packs:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load your packs. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadPublicPacks = async () => {
+    try {
+      const publicPacks = await getPublicPacks();
+      const packsWithClaims = await Promise.all(
+        publicPacks.map(async (pack) => {
+          if (pack.claimPoolId) {
+            const claimPool = await getClaimPool(pack.claimPoolId);
+            return { ...pack, claimPool: claimPool || undefined };
+          }
+          return pack;
+        })
+      );
+      setPacks(packsWithClaims);
+    } catch (error) {
+      console.error("Error loading public packs:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load community packs. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleCreatePack = async () => {
     if (!user || !packName || selectedCards.length !== CARDS_PER_PACK) return;
@@ -86,29 +152,52 @@ export default function BoosterPacks() {
     }
   };
 
-  const handleOpenPack = async (pack: BoosterPack) => {
-    if (!user) return;
+  const handleOpenPack = async (pack: PackWithClaims) => {
+    if (!user || !pack.claimPool) return;
 
     try {
+      const userClaims = pack.claimPool.claims[user.uid]?.count || 0;
+      if (userClaims >= pack.claimPool.perUserLimit) {
+        toast({
+          title: "Claim Limit Reached",
+          description: "You have already claimed this pack the maximum number of times.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (pack.claimPool.currentClaims >= pack.claimPool.totalLimit) {
+        toast({
+          title: "Pack Exhausted",
+          description: "This pack has reached its total claim limit.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const opening = await openBoosterPack(user.uid, pack.id);
       setOpenedPack(pack);
 
-      // Add cards to user's collection
-      const currentCards = JSON.parse(localStorage.getItem("pokemon-cards") || "[]");
-      localStorage.setItem(
-        "pokemon-cards",
-        JSON.stringify([...currentCards, ...opening.cards])
-      );
+      // Add cards to user's collection in Firebase
+      for (const card of opening.cards) {
+        await addCardToCollection(user.uid, card.id, {
+          name: card.name,
+          type: card.type,
+          imageUrl: card.image,
+          rarity: card.rarity,
+        });
+      }
 
       toast({
         title: "Pack Opened!",
-        description: `You got ${opening.cards.length} new cards!`,
+        description: `You got ${opening.cards.length} new cards! (${pack.claimPool.perUserLimit - (userClaims + 1)} personal claims remaining)`,
       });
     } catch (error) {
       console.error("Error opening pack:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to open pack. Please try again.";
       toast({
         title: "Error",
-        description: "Failed to open pack. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -204,15 +293,87 @@ export default function BoosterPacks() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="max-w-7xl mx-auto pt-20 px-4 sm:px-6 lg:px-8 pb-24">
-        <div className="text-center mb-12">
+        <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-4">Booster Packs</h1>
           <p className="text-gray-400 max-w-2xl mx-auto">
-            Create your own booster packs with exactly {CARDS_PER_PACK} cards!
+            Share and collect free booster packs with the community!
           </p>
         </div>
 
-        {/* Create Pack Section */}
-        <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800 mb-8">
+        <Tabs defaultValue="community" className="mb-8">
+          <TabsList className="grid w-full grid-cols-2 bg-white/5">
+            <TabsTrigger
+              value="community"
+              onClick={loadPublicPacks}
+              className="data-[state=active]:bg-white/10"
+            >
+              Community Packs
+            </TabsTrigger>
+            <TabsTrigger
+              value="my-packs"
+              onClick={loadUserPacks}
+              className="data-[state=active]:bg-white/10"
+            >
+              My Packs
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="community">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {packs.map((pack) => (
+                <Card
+                  key={pack.id}
+                  className="p-6 bg-white/10 backdrop-blur-sm border-gray-800 relative group"
+                >
+                  <div className="flex items-center gap-4 mb-4">
+                    <div className="p-3 rounded-full bg-yellow-400/10">
+                      <PackageIcon className="w-6 h-6 text-yellow-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">
+                        {pack.name}
+                      </h3>
+                      <p className="text-sm text-gray-400">
+                        By {pack.creatorName || "Anonymous"} • {pack.openCount} opens
+                        {pack.claimPool && (
+                          <>
+                            {" "}• {pack.claimPool.totalLimit - pack.claimPool.currentClaims} of {pack.claimPool.totalLimit} left
+                            {user && ` • ${pack.claimPool.perUserLimit - (pack.claimPool.claims[user.uid]?.count || 0)} personal claims left`}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleOpenPack(pack)}
+                    className="w-full bg-white/5 hover:bg-white/10 text-white"
+                    disabled={
+                      !user || 
+                      !pack.claimPool ||
+                      pack.claimPool.currentClaims >= pack.claimPool.totalLimit ||
+                      (pack.claimPool.claims[user.uid]?.count || 0) >= pack.claimPool.perUserLimit
+                    }
+                  >
+                    <Sparkles className="w-5 h-5 mr-2" />
+                    {!user 
+                      ? "Sign in to Open"
+                      : !pack.claimPool
+                        ? "Not Available"
+                        : pack.claimPool.currentClaims >= pack.claimPool.totalLimit
+                          ? "All Claims Taken"
+                          : (pack.claimPool.claims[user.uid]?.count || 0) >= pack.claimPool.perUserLimit
+                            ? "Personal Limit Reached"
+                            : "Open Pack"
+                    }
+                  </Button>
+                </Card>
+              ))}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="my-packs">
+            {/* Create Pack Section */}
+            <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800 mb-8">
           <h2 className="text-xl font-semibold text-white mb-4">
             Create New Pack
           </h2>
@@ -260,8 +421,8 @@ export default function BoosterPacks() {
           </div>
         </Card>
 
-        {/* Packs List */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* Packs List */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {packs.map((pack) => (
             <Card
               key={pack.id}
@@ -277,6 +438,12 @@ export default function BoosterPacks() {
                   </h3>
                   <p className="text-sm text-gray-400">
                     {pack.totalCards} cards • {pack.openCount} opens
+                    {pack.claimPool && (
+                      <>
+                        {" "}• {pack.claimPool.totalLimit - pack.claimPool.currentClaims} of {pack.claimPool.totalLimit} total claims left •{" "}
+                        {pack.claimPool.perUserLimit} max claims per user
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -284,9 +451,24 @@ export default function BoosterPacks() {
                 <Button
                   onClick={() => handleOpenPack(pack)}
                   className="flex-1 bg-white/5 hover:bg-white/10 text-white"
+                  disabled={
+                    !user || 
+                    !pack.claimPool ||
+                    pack.claimPool.currentClaims >= pack.claimPool.totalLimit ||
+                    (pack.claimPool.claims[user.uid]?.count || 0) >= pack.claimPool.perUserLimit
+                  }
                 >
                   <Sparkles className="w-5 h-5 mr-2" />
-                  Open Pack
+                  {!user 
+                    ? "Sign in to Open"
+                    : !pack.claimPool
+                      ? "Not Available"
+                      : pack.claimPool.currentClaims >= pack.claimPool.totalLimit
+                        ? "All Claims Taken"
+                        : (pack.claimPool.claims[user.uid]?.count || 0) >= pack.claimPool.perUserLimit
+                          ? "Personal Limit Reached"
+                          : "Open Pack"
+                  }
                 </Button>
                 <Button
                   variant="outline"
@@ -299,7 +481,9 @@ export default function BoosterPacks() {
               </div>
             </Card>
           ))}
-        </div>
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

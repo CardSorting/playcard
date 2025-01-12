@@ -1,9 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { useCart } from "../types";
+import { CardData } from "@/components/card-creator/types";
+import { useAuth } from "@/lib/contexts/auth-context";
+import { createCheckoutSession, processPayment, updateCheckoutShipping } from "@/lib/checkout";
+import { addCardToCollection } from "@/lib/collection";
 import CheckoutSummary from "./summary";
 import PaymentForm from "./payment-form";
 import ShippingForm from "./shipping-form";
@@ -15,8 +19,48 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { items, total, clearCart } = useCart();
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>("summary");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const initCheckout = async () => {
+      if (!user) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in to proceed with checkout.",
+          variant: "destructive",
+        });
+        navigate("/cart");
+        return;
+      }
+
+      if (items.length === 0) return;
+
+      try {
+        const cartItems = items.map(item => ({
+          id: item.id,
+          quantity: item.quantity,
+          price: item.price || 0,
+          sellerId: item.sellerId || user.uid,
+        }));
+
+        const session = await createCheckoutSession(user.uid, cartItems);
+        setSessionId(session.id);
+      } catch (error) {
+        console.error("Error creating checkout session:", error);
+        toast({
+          title: "Error",
+          description: "Failed to initialize checkout. Please try again.",
+          variant: "destructive",
+        });
+        navigate("/cart");
+      }
+    };
+
+    initCheckout();
+  }, [user, items, navigate, toast]);
 
   const steps: { id: CheckoutStep; label: string }[] = [
     { id: "summary", label: "Order Summary" },
@@ -41,43 +85,51 @@ export default function Checkout() {
     }
   };
 
-  const handleComplete = async () => {
-    if (items.length === 0) return;
+  const handleShippingSubmit = async (shippingData: any) => {
+    if (!sessionId || !user) return;
 
     setIsProcessing(true);
     try {
-      // Simulate checkout process
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await updateCheckoutShipping(
+        sessionId,
+        shippingData.addressId,
+        shippingData.methodId
+      );
+      handleNext();
+    } catch (error) {
+      console.error("Error updating shipping:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save shipping information. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleComplete = async () => {
+    if (!sessionId || !user || items.length === 0) return;
+
+    setIsProcessing(true);
+    try {
+      const { orderId } = await processPayment(sessionId, "payment-method-id");
 
       // Add items to collections
-      items.forEach((item) => {
+      for (const item of items) {
         if (item.type === "card") {
-          const cards = JSON.parse(
-            localStorage.getItem("pokemon-cards") || "[]",
-          );
-          for (let i = 0; i < item.quantity; i++) {
-            cards.push(item.item);
-          }
-          localStorage.setItem("pokemon-cards", JSON.stringify(cards));
-        } else {
-          const packs = JSON.parse(
-            localStorage.getItem("pokemon-booster-packs") || "[]",
-          );
-          for (let i = 0; i < item.quantity; i++) {
-            packs.push(item.item);
-          }
-          localStorage.setItem("pokemon-booster-packs", JSON.stringify(packs));
+          const cardItem = item.item as CardData;
+          await addCardToCollection(user.uid, item.id, {
+            name: cardItem.name,
+            type: cardItem.type,
+            imageUrl: cardItem.image,
+            rarity: cardItem.rarity,
+          });
+        } else if (item.type === "pack" && "packType" in item.item) {
+          // TODO: Implement booster pack collection logic when ready
+          console.log("Booster pack purchased:", item.item);
         }
-
-        // Remove from marketplace
-        const marketItems = JSON.parse(
-          localStorage.getItem("pokemon-marketplace") || "[]",
-        );
-        localStorage.setItem(
-          "pokemon-marketplace",
-          JSON.stringify(marketItems.filter((i) => i.id !== item.id)),
-        );
-      });
+      }
 
       clearCart();
       setCurrentStep("confirmation");
