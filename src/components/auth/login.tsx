@@ -1,16 +1,21 @@
 import { Button } from "@/components/ui/button";
 import { signInWithRedirect, GoogleAuthProvider } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/lib/contexts/auth-context";
 
 export default function Login() {
-  const navigate = useNavigate();
+  const { user, loading } = useAuth();
   const provider = new GoogleAuthProvider();
+
+  // If user is already authenticated, redirect to home
+  if (!loading && user) {
+    return <Navigate to="/" />;
+  }
 
   const handleGoogleSignIn = async () => {
     try {
       await signInWithRedirect(auth, provider);
-      // No need for navigation here as the page will redirect and handle return automatically
     } catch (error) {
       console.error("Error signing in with Google:", error);
     }

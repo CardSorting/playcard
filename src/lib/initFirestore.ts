@@ -10,28 +10,11 @@ export const COLLECTIONS = {
   COLLECTIONS: 'collections'
 } as const;
 
-// Initialize collections with default documents if needed
+// Initialize Firestore (no-op for now since we don't need metadata documents)
 export const initializeFirestore = async () => {
   try {
-    // Initialize collections
-    for (const collectionName of Object.values(COLLECTIONS)) {
-      // Create collection reference
-      const collectionRef = collection(db, collectionName);
-      
-      // Create a metadata document for each collection
-      const metadataDoc = doc(collectionRef, '_metadata');
-      const metadataSnapshot = await getDoc(metadataDoc);
-      
-      if (!metadataSnapshot.exists()) {
-        await setDoc(metadataDoc, {
-          createdAt: new Date().toISOString(),
-          version: '1.0',
-          collectionName
-        });
-      }
-    }
-
-    console.log('Firestore collections initialized successfully');
+    // Collections will be created automatically when documents are added
+    console.log('Firestore initialized successfully');
   } catch (error) {
     console.error('Error initializing Firestore:', error);
     throw error;

@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import Nav from './components/ui/nav';
 import { AuthProvider, useAuth } from './lib/contexts/auth-context';
 import { useEffect } from 'react';
 import { initializeFirestore } from './lib/initFirestore';
@@ -8,10 +9,27 @@ import Collection from './components/collection';
 import ImageGenerator from './components/image-generator';
 import Marketplace from './components/marketplace';
 import Claims from './components/claims';
+import CardCreator from './components/card-creator';
 import Login from './components/auth/login';
 import { Toaster } from './components/ui/toaster';
 
-// Protected route wrapper component
+// Route wrappers
+// Redirects authenticated users away from login page
+const PublicRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (user) {
+    return <Navigate to="/" />;
+  }
+
+  return <>{children}</>;
+};
+
+// Protects routes from unauthenticated users
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
 
@@ -51,8 +69,13 @@ const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <AuthProvider>
+      <Nav />
       <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          } />
           <Route path="/" element={<Home />} />
           <Route path="/booster-packs" element={
             <FirebaseInitializer>
@@ -86,6 +109,13 @@ function App() {
             <FirebaseInitializer>
               <ProtectedRoute>
                 <Claims />
+              </ProtectedRoute>
+            </FirebaseInitializer>
+          } />
+          <Route path="/card-creator" element={
+            <FirebaseInitializer>
+              <ProtectedRoute>
+                <CardCreator />
               </ProtectedRoute>
             </FirebaseInitializer>
           } />
