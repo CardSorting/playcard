@@ -6,15 +6,11 @@
   "scripts": {
     "seed": "node scripts/seed.js",
     "dev": "vite",
-    "dev:firebase": "concurrently \"firebase emulators:start\" \"vite\"",
     "build": "tsc && vite build",
     "build-no-errors": "tsc ; vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "types:supabase": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/supabase.ts",
-    "emulators": "firebase emulators:start",
-    "emulators:export": "firebase emulators:export ./emulator-data",
-    "emulators:start": "firebase emulators:start --import=./emulator-data"
+    "types:supabase": "npx supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > src/types/supabase.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.6.0",
