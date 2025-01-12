@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import CardPreview from "@/components/card-creator/CardPreview";
+import { CardData, PokemonType } from "@/components/card-creator/types";
 
 export default function Home() {
-  const demoCard = {
+  const demoCard: Partial<CardData> = {
     name: "Charizard",
-    type: "Fire",
+    type: "Fire" as PokemonType,
     image:
       "https://images.unsplash.com/photo-1628968434441-d9c1c66dcde3?w=800&auto=format&fit=crop",
   };

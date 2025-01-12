@@ -34,8 +34,8 @@ interface CartStore {
   total: number;
 }
 
-export const useCart = create<CartStore>(
-  persist(
+export const useCart = create<CartStore>()(
+  persist<CartStore>(
     (set) => ({
       items: [],
       itemCount: 0,
