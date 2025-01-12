@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { User, onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 import { auth } from '../firebase';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
@@ -15,19 +16,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const navigate = useNavigate();
+
   useEffect(() => {
-    // Only initialize auth if we're not on the home page
-    if (window.location.pathname !== '/') {
-      const unsubscribe = onAuthStateChanged(auth, (user) => {
-        setUser(user);
-        setLoading(false);
-      });
-      return unsubscribe;
-    } else {
-      // Don't initialize auth for home page
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
       setLoading(false);
-    }
-  }, []);
+    });
+
+    // Handle redirect result
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          navigate('/');
+        }
+      })
+      .catch((error) => {
+        console.error('Error handling redirect result:', error);
+      });
+
+    return unsubscribe;
+  }, [navigate]);
 
   return (
     <AuthContext.Provider value={{ user, loading }}>
