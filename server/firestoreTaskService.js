@@ -48,6 +48,34 @@ class FirestoreTaskService {
     }
   }
 
+  async updateTask(taskId, updates) {
+    try {
+      const now = Timestamp.now();
+      const taskRef = db.collection(TASK_COLLECTION).doc(taskId);
+      const statusRef = db.collection(TASK_STATUS_COLLECTION).doc(taskId);
+
+      const batch = db.batch();
+      
+      batch.update(taskRef, {
+        ...updates,
+        updatedAt: now
+      });
+      
+      if (updates.status) {
+        batch.update(statusRef, {
+          status: updates.status,
+          updatedAt: now
+        });
+      }
+
+      await batch.commit();
+      console.log('Task updated successfully:', taskId);
+    } catch (error) {
+      console.error('Error updating task:', error);
+      throw new Error('Failed to update task');
+    }
+  }
+
   async getTaskStatus(taskId) {
     try {
       console.log('Fetching task status:', taskId);
