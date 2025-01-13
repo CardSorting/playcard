@@ -25,11 +25,20 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const realtimeDb = getDatabase(app);
 
-// Configure auth persistence
-setPersistence(auth, browserSessionPersistence)
-  .catch((error) => {
-    console.error('Error setting auth persistence:', error);
-  });
+// Configure auth persistence and wait for initialization
+export const initializeFirebase = async () => {
+  try {
+    await setPersistence(auth, browserSessionPersistence);
+    console.log('Firebase initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('Error initializing Firebase:', error);
+    return false;
+  }
+};
+
+// Initialize Firebase immediately
+initializeFirebase();
 
 // Add token refresh listener
 auth.onIdTokenChanged(async (user) => {

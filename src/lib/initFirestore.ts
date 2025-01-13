@@ -1,5 +1,5 @@
 import { collection, doc, setDoc, getDoc } from 'firebase/firestore';
-import { db, auth } from './firebase';
+import { db, auth, initializeFirebase } from './firebase';
 
 // Define collection names as constants
 export const COLLECTIONS = {
@@ -14,6 +14,10 @@ export const COLLECTIONS = {
 export const initializeFirestore = async () => {
   try {
     console.log('Attempting Firestore initialization...');
+    
+    // Wait for Firebase initialization
+    await initializeFirebase();
+    
     const user = auth.currentUser;
     
     if (!user) {
