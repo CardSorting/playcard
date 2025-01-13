@@ -1,9 +1,45 @@
 {
-  "type": "Dark",
-  "prompts": [
-    "A dark-type creature lurking in the shadows, mysterious art",
-    "A gothic castle with gargoyles and bats, dark fantasy art",
-    "A moonlit forest with eerie fog and twisted trees, horror art",
-    "A shadowy figure with glowing red eyes, abstract art"
-  ]
-}
+    "type": "Dark",
+    "prompts": [
+      "Illustrate a dark and mysterious alleyway haunted by shadowy Pokémon.",
+      "Create a Dark-type Pokémon that blends into shadows, becoming invisible in dimly lit environments.",
+      "Depict a Pokémon with eyes that glow eerily in the darkness, striking fear into anyone who meets its gaze.",
+      "Imagine a Pokémon that can manipulate its own shadow, using it as a weapon to strike from unexpected angles.",
+      "Design a Dark-type Pokémon that thrives in moonless nights, using darkness to enhance its abilities.",
+      "Create a Pokémon that can control and summon creatures from the shadows to fight alongside it in battle.",
+      "Depict a Pokémon that absorbs light, leaving its surroundings in complete darkness and disorienting its foes.",
+      "Imagine a Pokémon that can turn into a cloud of darkness, passing through walls and evading attacks.",
+      "Design a Dark-type Pokémon that preys on the fear of other Pokémon, growing stronger the more fear it senses.",
+      "Create a Pokémon that can create illusions of terrifying creatures, confusing and scaring enemies.",
+      "Depict a Pokémon that can drain the energy from nearby light sources, plunging areas into pitch black.",
+      "Imagine a Pokémon that lurks in shadows, silently stalking its prey before delivering a swift and powerful strike.",
+      "Design a Pokémon that can wrap itself in shadows, becoming completely invisible to the naked eye.",
+      "Create a Pokémon that controls dark fog, which confuses and weakens enemies caught within its swirling mist.",
+      "Depict a Pokémon that steals the dreams of other Pokémon, growing stronger by feeding on their nightmares.",
+      "Imagine a Pokémon that can manipulate fear itself, turning even the bravest foes into trembling messes.",
+      "Design a Pokémon that can trap enemies within their own shadows, immobilizing them during battle.",
+      "Create a Pokémon that summons dark storms, blocking out the sun and unleashing chaos on the battlefield.",
+      "Depict a Pokémon that can disappear entirely when the moon is covered, using the darkness as a cloak.",
+      "Imagine a Pokémon that can manipulate dark energy to create shadowy duplicates of itself to confuse opponents.",
+      "Design a Dark-type Pokémon that can corrupt the minds of weaker Pokémon, turning them into mindless followers.",
+      "Create a Pokémon that hunts in complete silence, using the cover of darkness to track its enemies.",
+      "Depict a Pokémon that can turn off all nearby light sources with a mere glance, creating an impenetrable void.",
+      "Imagine a Pokémon that feeds off the negative emotions of others, using sadness, anger, and fear to empower itself.",
+      "Design a Pokémon that can open portals into the dark realm, allowing it to summon sinister creatures to assist in battle.",
+      "Create a Pokémon that haunts abandoned buildings, using the shadows of its surroundings as weapons.",
+      "Depict a Pokémon that can cast dark illusions, causing its enemies to see nightmarish visions in battle.",
+      "Imagine a Pokémon that can control and manipulate the shadows of other Pokémon, forcing them to attack their own allies.",
+      "Design a Pokémon that becomes stronger in total darkness, using the lack of light to its advantage in combat.",
+      "Create a Pokémon that hides in the shadows of trees and buildings, waiting for the perfect moment to ambush its prey.",
+      "Depict a Dark-type Pokémon that feeds on the darkness of night, drawing power from the absence of light.",
+      "Imagine a Pokémon that can transform into a living shadow, able to pass through solid objects with ease.",
+      "Design a Pokémon that creates shadowy tendrils to bind and restrain enemies, immobilizing them in battle.",
+      "Create a Pokémon that can manipulate dark energy to form protective barriers, shielding it from attacks.",
+      "Depict a Pokémon that can fade into darkness, leaving no trace of its presence behind when it retreats.",
+      "Imagine a Dark-type Pokémon that has the power to curse its enemies, inflicting them with bad luck and misfortune.",
+      "Design a Pokémon that commands an army of shadow creatures, using them to overwhelm its enemies in battle.",
+      "Create a Pokémon that can extend its own shadow to great lengths, attacking foes from a distance with shadowy claws.",
+      "Depict a Pokémon that can transform into pure darkness, becoming untouchable and immune to physical attacks.",
+      "Imagine a Pokémon that causes night to fall prematurely, covering entire areas in darkness to gain the upper hand in battle."
+    ]
+  }  

@@ -1,9 +1,35 @@
 {
-  "type": "Fairy",
-  "prompts": [
-    "A fairy-type creature with delicate wings and magical powers, fantasy art",
-    "A whimsical garden with colorful flowers and sparkling lights, magical scene",
-    "A rainbow arching over a peaceful meadow, nature art",
-    "A glowing fairy orb floating in a mystical forest, ethereal art"
-  ]
-}
+    "type": "Fairy",
+    "prompts": [
+      "Design a whimsical fairy Pokémon dancing amidst sparkling flowers in a magical meadow.",
+      "Imagine a Fairy-type Pokémon that can create illusions, using dazzling lights and sparkling dust to confuse and charm its enemies.",
+      "Depict a Fairy-type Pokémon that can manipulate moonlight, using the soft glow to heal its allies or cast powerful spells in battle.",
+      "Create a Fairy-type Pokémon that can summon enchanted butterflies, each one carrying a different magical ability to aid it in combat.",
+      "Design a Fairy-type Pokémon that can weave protective shields out of stardust, deflecting attacks with shimmering barriers of light.",
+      "Imagine a Fairy-type Pokémon that can communicate with plants and flowers, commanding them to grow rapidly and entangle its foes.",
+      "Depict a Fairy-type Pokémon that can travel on beams of light, flitting around the battlefield at high speeds and delivering quick, powerful strikes.",
+      "Create a Fairy-type Pokémon that can sing lullabies so enchanting that they put enemies to sleep, allowing it to control the battlefield with ease.",
+      "Design a Fairy-type Pokémon that can summon rainbows, using their arcane power to boost its abilities and create powerful, color-based attacks.",
+      "Imagine a Fairy-type Pokémon that can scatter sparkling dust across the battlefield, imbuing its allies with magical energy while blinding its foes.",
+      "Depict a Fairy-type Pokémon that can summon shooting stars to strike its enemies, each star leaving behind a trail of magical energy that lingers on the battlefield.",
+      "Create a Fairy-type Pokémon that can manipulate the winds, sending gentle gusts that carry healing powers to its allies or fierce storms to its enemies.",
+      "Design a Fairy-type Pokémon that can reflect the light of the stars, using cosmic energy to enhance its attacks and cloak itself in protective magic.",
+      "Imagine a Fairy-type Pokémon that can enchant objects around it, bringing them to life to fight alongside it or create distractions in battle.",
+      "Depict a Fairy-type Pokémon that can control the seasons, summoning spring blooms to heal its team or autumn leaves to overwhelm its foes.",
+      "Create a Fairy-type Pokémon that can dance through the air on sparkling wings, leaving behind trails of glittering magic that disorient its enemies.",
+      "Design a Fairy-type Pokémon that can create portals to other dimensions, using them to teleport around the battlefield or call upon ancient powers.",
+      "Imagine a Fairy-type Pokémon that can cast powerful charms, making enemies fall in love with it and causing them to hesitate or even refuse to attack.",
+      "Depict a Fairy-type Pokémon that can summon a magical field of flowers that bloom beneath its feet, each flower granting it new abilities as it moves.",
+      "Create a Fairy-type Pokémon that can turn invisible by blending into beams of moonlight, allowing it to strike without being seen.",
+      "Design a Fairy-type Pokémon that can create illusions of fairy-tale creatures, summoning legendary beasts to aid it in battle or confuse its foes.",
+      "Imagine a Fairy-type Pokémon that can heal its allies by touching them with its wand, channeling pure magical energy to restore their strength.",
+      "Depict a Fairy-type Pokémon that can control time within a small area, allowing it to speed up or slow down events to gain the upper hand in battle.",
+      "Create a Fairy-type Pokémon that can summon fireflies to light up the night, each one carrying a spark of magic that enhances its powers in the dark.",
+      "Design a Fairy-type Pokémon that can create protective barriers out of light, shielding its team from harm while reflecting attacks back at its enemies.",
+      "Imagine a Fairy-type Pokémon that can weave dreams into reality, turning the hopes and wishes of its allies into powerful buffs and magical attacks.",
+      "Depict a Fairy-type Pokémon that can summon gentle rain that heals its team, while also creating beams of light that burn its foes with radiant energy.",
+      "Create a Fairy-type Pokémon that can charm the stars themselves, calling down shooting stars and constellations to guide and protect it in battle.",
+      "Design a Fairy-type Pokémon that can summon a magical forest around it, filled with mystical creatures that fight on its behalf or provide healing.",
+      "Imagine a Fairy-type Pokémon that can manipulate time through magical clocks, allowing it to reverse recent events or speed up its team's movements."
+    ]
+  }  

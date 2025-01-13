@@ -1,9 +1,35 @@
 {
-  "type": "Electric",
-  "prompts": [
-    "A powerful electric-type creature surrounded by lightning bolts, dynamic scene",
-    "A futuristic cityscape with neon lights and electric currents, cyberpunk art",
-    "A thunderstorm with lightning striking a tall tower, dramatic scene",
-    "A glowing electric orb floating in a dark space, abstract art"
-  ]
-}
+    "type": "Electric",
+    "prompts": [
+      "Create an Electric-type Pokémon that can harness the power of thunderstorms, summoning lightning bolts to strike its enemies with pinpoint accuracy.",
+      "Imagine an Electric-type Pokémon that can manipulate magnetic fields, using them to control metal objects and create barriers or weapons.",
+      "Depict an Electric-type Pokémon that can generate electromagnetic pulses, disabling technology and stunning foes within a wide radius.",
+      "Create an Electric-type Pokémon that can transform into pure electricity, allowing it to travel through power lines and strike from unexpected places.",
+      "Design an Electric-type Pokémon that can absorb energy from nearby power sources, becoming more powerful the more it feeds on electricity.",
+      "Imagine an Electric-type Pokémon that can create electric storms, surrounding itself with crackling lightning that burns and shocks enemies who get too close.",
+      "Depict an Electric-type Pokémon that can generate sonic booms with electrically charged roars, disrupting the battlefield with powerful shockwaves.",
+      "Create an Electric-type Pokémon that can manipulate static electricity, charging the air around it to create defensive barriers or immobilize foes.",
+      "Design an Electric-type Pokémon that can control electric currents in water, shocking anything that comes into contact with it in aquatic environments.",
+      "Imagine an Electric-type Pokémon that can discharge electricity in precise bursts, targeting weak spots in an opponent's defenses for maximum damage.",
+      "Depict an Electric-type Pokémon that can power up its own body, increasing its speed and strength with surges of electricity flowing through its muscles.",
+      "Create an Electric-type Pokémon that can manipulate the flow of electrons, allowing it to alter electronic devices and control machines remotely.",
+      "Design an Electric-type Pokémon that can generate electrical fields around itself, repelling attacks and disabling anything mechanical within its vicinity.",
+      "Imagine an Electric-type Pokémon that can store massive amounts of energy within its body, releasing it in devastating lightning strikes when needed.",
+      "Depict an Electric-type Pokémon that can create thunderclouds over the battlefield, constantly raining down bolts of lightning to wear down its enemies.",
+      "Create an Electric-type Pokémon that can control plasma, using it to create high-energy bursts that can melt through solid objects.",
+      "Design an Electric-type Pokémon that can charge up nearby particles, ionizing the air and causing random sparks and electrical bursts to occur around it.",
+      "Imagine an Electric-type Pokémon that can transform kinetic energy into electricity, converting the impact of attacks into power it can redirect at its foes.",
+      "Depict an Electric-type Pokémon that can harness bioelectricity, shocking its opponents by drawing energy directly from their nervous systems.",
+      "Create an Electric-type Pokémon that can bend lightning, sending it in arcs around the battlefield to hit multiple targets simultaneously.",
+      "Design an Electric-type Pokémon that can supercharge its body to move at the speed of lightning, striking its enemies before they even realize it’s there.",
+      "Imagine an Electric-type Pokémon that can emit powerful electric pulses through the ground, shocking any enemies that come into contact with the earth.",
+      "Depict an Electric-type Pokémon that can create a storm of charged particles, using the static to disorient and paralyze its enemies.",
+      "Create an Electric-type Pokémon that can store electricity in special organs, allowing it to unleash massive electric discharges when provoked.",
+      "Design an Electric-type Pokémon that can control the electric potential between objects, creating arcs of lightning that jump unpredictably across the battlefield.",
+      "Imagine an Electric-type Pokémon that can generate electromagnetic waves that disrupt the senses, causing its enemies to lose their ability to focus or aim.",
+      "Depict an Electric-type Pokémon that can manipulate ionized gases, creating glowing, electrified plasma that it can hurl at its enemies.",
+      "Create an Electric-type Pokémon that can summon lightning from the sky, using it to electrify the battlefield and strike any target it wishes.",
+      "Design an Electric-type Pokémon that can charge the ground beneath its enemies, electrifying the terrain to shock anyone who stands on it.",
+      "Imagine an Electric-type Pokémon that can control the electrical impulses in other creatures, briefly taking control of their movements or disrupting their coordination."
+    ]
+  }  
