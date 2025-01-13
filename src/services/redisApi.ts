@@ -12,13 +12,14 @@ export const redisApi = {
   },
 
   async get(key: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/redis/get/${key}`);
+    const decodedKey = decodeURIComponent(key);
+    const response = await fetch(`${API_BASE_URL}/redis/get/${encodeURIComponent(decodedKey)}`);
     const data = await response.json();
     return data.value;
   },
 
   async del(key: string): Promise<void> {
-    await fetch(`${API_BASE_URL}/redis/del/${key}`, {
+    await fetch(`${API_BASE_URL}/redis/del/${encodeURIComponent(key)}`, {
       method: 'DELETE',
     });
   },
@@ -44,7 +45,7 @@ export const redisApi = {
   },
 
   async dequeue(queueName: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/redis/xread/${queueName}`);
+    const response = await fetch(`${API_BASE_URL}/redis/xread/${encodeURIComponent(queueName)}`);
     const data = await response.json();
     return data.value;
   },
@@ -78,7 +79,7 @@ export const redisApi = {
   },
 
   async getTaskHistory(queueName: string, limit: number = 100): Promise<any[]> {
-    const response = await fetch(`${API_BASE_URL}/task-history/${queueName}?limit=${limit}`);
+    const response = await fetch(`${API_BASE_URL}/task-history/${encodeURIComponent(queueName)}?limit=${limit}`);
     return response.json();
   }
 };
