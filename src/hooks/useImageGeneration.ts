@@ -9,6 +9,7 @@ const POLL_INTERVAL = 5000; // 5 seconds
 interface GenerationResult {
   taskId: string;
   imageUrl?: string;
+  imageUrls?: string[];
   status: "pending" | "completed" | "error";
   progress?: number;
 }
@@ -55,14 +56,15 @@ export default function useImageGeneration() {
       const taskData = await pollTaskStatus(taskId);
       
       if (taskData.status === "completed") {
-        const imageUrl = taskData.output.image_url;
+        const imageUrls = taskData.output.image_urls;
         setResult({
           taskId,
           status: "completed",
-          imageUrl,
+          imageUrl: imageUrls[0], // Keep first URL for backward compatibility
+          imageUrls,
           progress: 100
         });
-        await storeGeneration(prompt, aspectRatio, imageUrl, user.uid);
+        await storeGeneration(prompt, aspectRatio, imageUrls[0], user.uid);
         toast({
           title: "Success",
           description: "Image generated successfully!",

@@ -1,12 +1,15 @@
 import axios from "axios";
 
+interface TaskOutput {
+  image_url: string;
+  image_urls?: string[];
+  progress?: number;
+}
+
 interface TaskResponse {
   task_id: string;
   status: string;
-  output?: {
-    image_url: string;
-    progress?: number;
-  };
+  output?: TaskOutput;
 }
 
 export const generateImageTask = async (prompt: string, aspectRatio: string): Promise<string> => {
