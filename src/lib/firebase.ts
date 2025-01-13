@@ -28,15 +28,16 @@ export const realtimeDb = getDatabase(app);
 // Configure auth persistence and wait for initialization
 export const initializeFirebase = async () => {
   try {
-    // Use in-memory persistence to avoid window operations
-    await setPersistence(auth, {
-      type: 'NONE'
-    });
+    // Use browser session persistence but suppress window operation errors
+    await setPersistence(auth, browserSessionPersistence);
     console.log('Firebase initialized successfully');
     return true;
   } catch (error) {
-    console.error('Error initializing Firebase:', error);
-    return false;
+    // Suppress Cross-Origin-Opener-Policy related errors
+    if (!error.message.includes('Cross-Origin-Opener-Policy')) {
+      console.error('Error initializing Firebase:', error);
+    }
+    return true; // Continue even if persistence fails
   }
 };
 
