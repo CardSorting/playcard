@@ -1,67 +1,68 @@
-import { useState, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { generateImageTask } from "@/services/imageGeneration";
+import { generateImageTask, subscribeToTaskUpdates } from "@/services/imageGeneration";
 import { storeGeneration } from "@/services/generationHistory";
 import { useAuth } from "@/lib/contexts/auth-context";
-
-const INITIAL_POLL_INTERVAL = 5000; // 5 seconds
-const MAX_POLL_INTERVAL = 30000; // 30 seconds
-const MAX_RETRIES = 5;
-const API_BASE_URL = 'http://localhost:3001';
 
 interface GenerationResult {
   taskId: string;
   imageUrl?: string;
-  imageUrls?: string[];
   status: "pending" | "completed" | "error";
   progress?: number;
 }
-
-const mapApiStatus = (apiStatus: string): "pending" | "completed" | "error" => {
-  switch (apiStatus) {
-    case "Completed":
-      return "completed";
-    case "Processing":
-    case "Pending":
-    case "Staged":
-      return "pending";
-    case "Failed":
-    default:
-      return "error";
-  }
-};
 
 export default function useImageGeneration() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
-  const pollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const retryCountRef = useRef(0);
 
   const handleGenerate = async (prompt: string, aspectRatio: string) => {
     if (!user) return;
 
     setIsGenerating(true);
     setResult({ taskId: "", status: "pending", progress: 0 });
-    retryCountRef.current = 0;
 
     try {
       const generationResult = await generateImageTask(prompt, aspectRatio);
       
       if (!generationResult?.task_id) {
-        throw new Error("Invalid response from image generation service");
+        throw new Error("Failed to start image generation");
       }
 
       setResult({
         taskId: generationResult.task_id,
-        status: mapApiStatus(generationResult.status),
-        imageUrl: generationResult.image_url,
-        imageUrls: generationResult.image_urls,
-        progress: generationResult.progress
+        status: "pending",
+        progress: 0
       });
-      
-      pollForResult(generationResult.task_id, prompt, aspectRatio, INITIAL_POLL_INTERVAL);
+
+      // Subscribe to task updates
+      const unsubscribe = subscribeToTaskUpdates(generationResult.task_id, (task) => {
+        setResult({
+          taskId: task.id,
+          status: task.status,
+          progress: task.progress,
+          imageUrl: task.imageUrl
+        });
+
+        if (task.status === "completed") {
+          storeGeneration(prompt, aspectRatio, task.imageUrl, user.uid);
+          toast({
+            title: "Success",
+            description: "Image generated successfully!",
+          });
+          setIsGenerating(false);
+          unsubscribe();
+        } else if (task.status === "error") {
+          toast({
+            title: "Error",
+            description: "Failed to generate image",
+            variant: "destructive",
+          });
+          setIsGenerating(false);
+          unsubscribe();
+        }
+      });
 
     } catch (error) {
       console.error("Error generating image:", error);
@@ -72,116 +73,6 @@ export default function useImageGeneration() {
         variant: "destructive",
       });
       setIsGenerating(false);
-    }
-  };
-
-  const pollForResult = async (
-    taskId: string,
-    prompt: string,
-    aspectRatio: string,
-    interval: number
-  ) => {
-    if (!user || !taskId) {
-      cleanupPolling();
-      return;
-    }
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/task-status/${taskId}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch task status: ${response.statusText}`);
-      }
-      const taskStatus = await response.json();
-      
-      if (!taskStatus) {
-        throw new Error("Invalid response from task status API");
-      }
-
-      setResult({
-        taskId,
-        status: mapApiStatus(taskStatus.status),
-        imageUrl: taskStatus.output?.image_url,
-        imageUrls: taskStatus.output?.image_urls,
-        progress: taskStatus.output?.progress
-      });
-
-      if (taskStatus.status === "completed") {
-        await storeGeneration(prompt, aspectRatio, taskStatus.output?.image_url, user.uid);
-        toast({
-          title: "Success",
-          description: "Image generated successfully!",
-        });
-        cleanupPolling();
-        setIsGenerating(false);
-      } else if (taskStatus.status === "pending") {
-        scheduleNextPoll(taskId, prompt, aspectRatio, interval);
-      } else {
-        throw new Error(
-          taskStatus.error || 
-          `Task failed with status: ${taskStatus.status}`
-        );
-      }
-    } catch (error) {
-      console.error("Error polling task status:", {
-        taskId,
-        error: error.message,
-        stack: error.stack,
-        response: {
-          status: error.response?.status,
-          data: error.response?.data
-        }
-      });
-
-      if (error.message === "Invalid response from task status API" || error.response?.status === 400 || error.response?.status === 404) {
-        retryCountRef.current++;
-        if (retryCountRef.current >= MAX_RETRIES) {
-          console.error("Max retries reached for task:", taskId);
-          setResult({ taskId, status: "error" });
-          toast({
-            title: "Error",
-            description: `Failed to generate image: ${error.message}`,
-            variant: "destructive",
-          });
-          cleanupPolling();
-          setIsGenerating(false);
-          return;
-        }
-        
-        // Exponential backoff for retries
-        const nextInterval = Math.min(interval * 2, MAX_POLL_INTERVAL);
-        scheduleNextPoll(taskId, prompt, aspectRatio, nextInterval);
-      } else {
-        setResult({ taskId, status: "error" });
-        toast({
-          title: "Error",
-          description: `Failed to generate image: ${error.message}`,
-          variant: "destructive",
-        });
-        cleanupPolling();
-        setIsGenerating(false);
-      }
-    }
-  };
-
-  const scheduleNextPoll = (
-    taskId: string,
-    prompt: string,
-    aspectRatio: string,
-    interval: number
-  ) => {
-    if (pollTimeoutRef.current) {
-      clearTimeout(pollTimeoutRef.current);
-    }
-    pollTimeoutRef.current = setTimeout(
-      () => pollForResult(taskId, prompt, aspectRatio, interval),
-      interval
-    );
-  };
-
-  const cleanupPolling = () => {
-    if (pollTimeoutRef.current) {
-      clearTimeout(pollTimeoutRef.current);
-      pollTimeoutRef.current = null;
     }
   };
 
