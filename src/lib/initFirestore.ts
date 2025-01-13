@@ -16,7 +16,8 @@ export const initializeFirestore = async () => {
     // Verify user document exists
     const user = auth.currentUser;
     if (!user) {
-      throw new Error('No authenticated user found');
+      console.log('No authenticated user - skipping Firestore initialization');
+      return false;
     }
 
     const userRef = doc(db, 'users', user.uid);
@@ -34,9 +35,10 @@ export const initializeFirestore = async () => {
     }
 
     console.log('Firestore initialized successfully');
+    return true;
   } catch (error) {
     console.error('Error initializing Firestore:', error);
-    throw error;
+    return false;
   }
 };
 

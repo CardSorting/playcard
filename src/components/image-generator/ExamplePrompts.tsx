@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-
+import TypeIcon from "@/components/card-creator/TypeIcon";
+import { PokemonType } from "@/components/card-creator/types";
 
 interface ExamplePromptsProps {
   onSelectExample: (prompt: string) => void;
@@ -33,15 +34,45 @@ const ExamplePrompts: React.FC<ExamplePromptsProps> = ({ onSelectExample }) => {
       ];
 
       const promises = types.map((type) =>
-        import(`./types/${type}.json`).then((module) => module.default)
+        import(`./types/${type}.json`)
+          .then((module) => {
+            if (!module.default || !module.default.type || !module.default.prompts) {
+              console.error(`Invalid JSON structure in ${type}.json`);
+              return null;
+            }
+            return module.default;
+          })
+          .catch((error) => {
+            console.error(`Failed to load ${type}.json:`, error);
+            return null;
+          })
       );
 
       const results = await Promise.all(promises);
-      setTypePrompts(results);
+      
+      // Filter and log invalid results
+      const validResults = results.filter((item) => {
+        if (!item) {
+          return false;
+        }
+        if (!item.type || !item.prompts || !Array.isArray(item.prompts)) {
+          console.error('Invalid JSON structure:', item);
+          return false;
+        }
+        return true;
+      });
+
+      if (validResults.length === 0) {
+        console.error('No valid prompt files loaded');
+        return;
+      }
+      
+      console.log('Successfully loaded:', validResults.map(r => r.type));
+      setTypePrompts(validResults);
 
       // Initialize prompt state with shuffled versions of each type's prompts
       const initialPromptState: { [key: string]: string[] } = {};
-      results.forEach((item) => {
+      validResults.forEach((item) => {
         initialPromptState[item.type] = shuffleArray([...item.prompts]);
       });
       setPromptState(initialPromptState);
@@ -69,7 +100,13 @@ const ExamplePrompts: React.FC<ExamplePromptsProps> = ({ onSelectExample }) => {
       const updatedPrompts = currentPrompts.slice(1);
       if (updatedPrompts.length === 0) {
         // Re-shuffle if all prompts are used up
-        updatedPrompts.push(...shuffleArray(typePrompts.find((item) => item.type === type)?.prompts || []));
+        const typeData = typePrompts.find((item) => item.type === type);
+        if (typeData && Array.isArray(typeData.prompts)) {
+          updatedPrompts.push(...shuffleArray(typeData.prompts));
+        } else {
+          console.error(`No prompts found for type: ${type}`);
+          updatedPrompts.push(...[]);
+        }
       }
       setPromptState((prevState) => ({ ...prevState, [type]: updatedPrompts }));
     }
@@ -90,6 +127,7 @@ const ExamplePrompts: React.FC<ExamplePromptsProps> = ({ onSelectExample }) => {
                   onClick={() => handleIconClick(item.type)}
                   className="flex flex-col items-center justify-center p-2"
                 >
+                  <TypeIcon type={item.type as PokemonType}  />
                   <p className="text-xs mt-1">
                     {item.type}
                   </p>

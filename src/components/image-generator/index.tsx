@@ -169,7 +169,7 @@ export default function ImageGenerator() {
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       <div className="max-w-7xl mx-auto pt-20 px-4 sm:px-6 lg:px-8 pb-24">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-4">
+          <h1 className="text-5xl font-bold text-white mb-4">
             AI Image Generator
           </h1>
           <p className="text-gray-400 max-w-2xl mx-auto">
@@ -180,77 +180,84 @@ export default function ImageGenerator() {
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Input Section */}
-          <ExamplePrompts onSelectExample={(prompt) => setPrompt(prompt)} />
-          <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800">
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="prompt">Prompt</Label>
-                <Input
-                  id="prompt"
-                  placeholder="Describe the image you want to generate..."
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  className="bg-white/5 border-gray-700 text-white"
-                />
+          <div className="space-y-8">
+            <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800">
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="prompt">Prompt</Label>
+                  <Input
+                    id="prompt"
+                    placeholder="Describe the image you want to generate..."
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    className="bg-white/5 border-gray-700 text-white"
+                  />
+                </div>
+
+                <ExamplePrompts onSelectExample={(prompt) => setPrompt(prompt)} />
+                
+
+                <div className="space-y-2">
+                  <Label>Aspect Ratio</Label>
+                  <Select value={aspectRatio} onValueChange={setAspectRatio}>
+                    <SelectTrigger className="bg-white/5 border-gray-700 text-white">
+                      <SelectValue placeholder="Select aspect ratio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="16:9">16:9 - Landscape</SelectItem>
+                      <SelectItem value="4:3">4:3 - Standard</SelectItem>
+                      <SelectItem value="1:1">1:1 - Square</SelectItem>
+                      <SelectItem value="9:16">9:16 - Portrait</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex gap-4">
+                  <Button
+                    className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black"
+                    onClick={handleGenerate}
+                    disabled={!prompt || isGenerating || !user}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <ImageIcon className="w-4 h-4 mr-2" />
+                        Generate Image
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="bg-white/5 border-gray-700 text-white hover:bg-white/10"
+                    onClick={() => setShowHistory(!showHistory)}
+                  >
+                    <History className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {!user && (
+                  <p className="text-sm text-yellow-400">
+                    Please sign in to generate images
+                  </p>
+                )}
               </div>
-
-              <div className="space-y-2">
-                <Label>Aspect Ratio</Label>
-                <Select value={aspectRatio} onValueChange={setAspectRatio}>
-                  <SelectTrigger className="bg-white/5 border-gray-700 text-white">
-                    <SelectValue placeholder="Select aspect ratio" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="16:9">16:9 - Landscape</SelectItem>
-                    <SelectItem value="4:3">4:3 - Standard</SelectItem>
-                    <SelectItem value="1:1">1:1 - Square</SelectItem>
-                    <SelectItem value="9:16">9:16 - Portrait</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex gap-4">
-                <Button
-                  className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black"
-                  onClick={handleGenerate}
-                  disabled={!prompt || isGenerating || !user}
-                >
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                      Generate Image
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  variant="outline"
-                  className="bg-white/5 border-gray-700 text-white hover:bg-white/10"
-                  onClick={() => setShowHistory(!showHistory)}
-                >
-                  <History className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {!user && (
-                <p className="text-sm text-yellow-400">
-                  Please sign in to generate images
-                </p>
-              )}
-            </div>
-          </Card>
+            </Card>
+          </div>
 
           {/* Preview Section */}
-          <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800">
+          <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800 relative">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              {showHistory ? "Generation History" : "Generated Image"}
+            </h3>
             {showHistory ? (
               <div className="space-y-4">
                 <div className="flex justify-between items-center">
-                  <h3 className="text-lg font-semibold text-white">Generation History</h3>
+                  
                   <Button
                     variant="ghost"
                     className="text-gray-400 hover:text-white"
@@ -284,7 +291,7 @@ export default function ImageGenerator() {
                 </div>
               </div>
             ) : (
-              <div className="aspect-square w-full rounded-lg overflow-hidden relative">
+              <div className="aspect-square w-full rounded-lg overflow-hidden relative bg-white/5">
                 {result?.imageUrl ? (
                   <>
                     <img
@@ -301,7 +308,7 @@ export default function ImageGenerator() {
                     </Button>
                   </>
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-white/5">
+                  <div className="w-full h-full flex items-center justify-center">
                     {isGenerating ? (
                       <div className="text-center">
                         <Loader2 className="w-8 h-8 mb-2 mx-auto animate-spin text-yellow-400" />

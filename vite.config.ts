@@ -16,6 +16,11 @@ export default defineConfig({
   define: {
     __USE_EMULATORS__: process.env.VITE_USE_EMULATORS === 'true'
   },
+  server: {
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
+    }
+  },
   optimizeDeps: {
     entries: ["src/main.tsx", "src/tempobook/**/*"],
     include: ["@mui/material", "@mui/icons-material"],

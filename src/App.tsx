@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Nav from './components/ui/nav';
 import { AuthProvider, useAuth } from './lib/contexts/auth-context';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { initializeFirestore } from './lib/initFirestore';
 import Home from './components/home';
 import BoosterPacks from './components/booster-packs';
@@ -48,23 +48,36 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 // Initialize Firebase component
 const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
+  const [firestoreInitialized, setFirestoreInitialized] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     const initialize = async () => {
       try {
-        await initializeFirestore();
+        const initialized = await initializeFirestore();
+        setFirestoreInitialized(initialized);
+        if (!initialized) {
+          console.log('Firestore initialization skipped - no authenticated user');
+        }
       } catch (error) {
         console.error('Failed to initialize Firestore:', error);
+        setError(error as Error);
       }
     };
 
-    if (!loading && user) {
-      initialize();
-    }
+    initialize();
   }, [user, loading]);
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div>Loading authentication...</div>;
+  }
+
+  if (error) {
+    return <div>Error initializing Firestore: {error.message}</div>;
+  }
+
+  if (!firestoreInitialized) {
+    return <div>Initializing Firestore...</div>;
   }
 
   return <>{children}</>;
