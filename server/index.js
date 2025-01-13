@@ -7,7 +7,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // Initialize Redis client with proper error handling
-const redis = new Redis(process.env.VITE_REDIS_URL || 'redis://localhost:6379');
+const redis = new Redis(process.env.REDIS_URL || process.env.VITE_REDIS_URL || 'redis://localhost:6379');
 
 redis.on('connect', () => {
   console.log('Connected to Redis');
@@ -39,6 +39,47 @@ const getTaskQueueKey = (priority) => `task_queue:${priority}`;
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// Basic Redis operations
+app.post('/redis/set', async (req, res) => {
+  try {
+    const { key, value, ttl } = req.body;
+    if (ttl) {
+      await redis.set(key, JSON.stringify(value), 'EX', ttl);
+    } else {
+      await redis.set(key, JSON.stringify(value));
+    }
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Redis set error:', error);
+    res.status(500).json({ error: 'Failed to set value' });
+  }
+});
+
+app.get('/redis/get/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const value = await redis.get(key);
+    if (value === null) {
+      return res.status(404).json({ error: 'Key not found' });
+    }
+    res.status(200).json({ value: JSON.parse(value) });
+  } catch (error) {
+    console.error('Redis get error:', error);
+    res.status(500).json({ error: 'Failed to get value' });
+  }
+});
+
+app.delete('/redis/del/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    await redis.del(key);
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Redis del error:', error);
+    res.status(500).json({ error: 'Failed to delete key' });
+  }
 });
 
 // Enhanced Redis operations
