@@ -24,8 +24,8 @@ export const redisApi = {
   },
 
   async enqueue(queueName: string, value: Record<string, any>, priority: number = 2): Promise<string> {
-    // Convert object to field-value pairs array
-    const fieldValuePairs = Object.entries(value).flat();
+    // Convert object to array of [key, value] pairs
+    const fieldValuePairs = Object.entries(value);
     
     const response = await fetch(`${API_BASE_URL}/redis/xadd`, {
       method: 'POST',
