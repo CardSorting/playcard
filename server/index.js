@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import Redis from 'ioredis';
+import { v4 as uuidv4 } from 'uuid';
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -20,187 +21,190 @@ redis.on('error', (err) => {
 app.use(cors());
 app.use(express.json());
 
+// Constants
+const TASK_PRIORITIES = {
+  LOW: 1,
+  NORMAL: 2,
+  HIGH: 3
+};
+
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [1000, 5000, 15000]; // in milliseconds
+
+// Helper functions
+const getTaskKey = (taskId) => `task:${taskId}`;
+const getTaskStatusKey = (taskId) => `task_status:${taskId}`;
+const getTaskQueueKey = (priority) => `task_queue:${priority}`;
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Redis operations
-app.post('/redis/set', async (req, res) => {
-  try {
-    const { key, value, ttl } = req.body;
-    if (ttl) {
-      await redis.set(key, JSON.stringify(value), 'EX', ttl);
-    } else {
-      await redis.set(key, JSON.stringify(value));
-    }
-    res.status(200).json({ success: true });
-  } catch (error) {
-    console.error('Redis set error:', error);
-    res.status(500).json({ error: 'Failed to set value' });
-  }
-});
-
-app.get('/redis/get/:key', async (req, res) => {
-  try {
-    const { key } = req.params;
-    const value = await redis.get(key);
-    res.status(200).json({ value: value ? JSON.parse(value) : null });
-  } catch (error) {
-    console.error('Redis get error:', error);
-    res.status(500).json({ error: 'Failed to get value' });
-  }
-});
-
-app.delete('/redis/del/:key', async (req, res) => {
-  try {
-    const { key } = req.params;
-    await redis.del(key);
-    res.status(200).json({ success: true });
-  } catch (error) {
-    console.error('Redis delete error:', error);
-    res.status(500).json({ error: 'Failed to delete key' });
-  }
-});
-
-app.post('/redis/enqueue', async (req, res) => {
-  try {
-    const { queueName, value } = req.body;
-    await redis.rpush(queueName, JSON.stringify(value));
-    res.status(200).json({ success: true });
-  } catch (error) {
-    console.error('Redis enqueue error:', error);
-    res.status(500).json({ error: 'Failed to enqueue value' });
-  }
-});
-
-app.get('/redis/dequeue/:queueName', async (req, res) => {
-  try {
-    const { queueName } = req.params;
-    const value = await redis.lpop(queueName);
-    res.status(200).json({ value: value ? JSON.parse(value) : null });
-  } catch (error) {
-    console.error('Redis dequeue error:', error);
-    res.status(500).json({ error: 'Failed to dequeue value' });
-  }
-});
-
+// Enhanced Redis operations
 app.post('/redis/xadd', async (req, res) => {
   try {
-    const { queueName, fieldValuePairs } = req.body;
-    await redis.xadd(queueName, '*', ...fieldValuePairs);
-    res.status(200).json({ success: true });
+    const { queueName, fieldValuePairs, priority = TASK_PRIORITIES.NORMAL } = req.body;
+    const taskId = uuidv4();
+    
+    // Store task metadata
+    await redis.hset(getTaskKey(taskId), {
+      status: 'pending',
+      createdAt: Date.now(),
+      priority,
+      retries: 0,
+      ...Object.fromEntries(fieldValuePairs)
+    });
+
+    // Add to priority queue
+    await redis.zadd(getTaskQueueKey(priority), priority, taskId);
+
+    res.status(200).json({ success: true, taskId });
   } catch (error) {
     console.error('Redis xadd error:', error);
     res.status(500).json({ error: 'Failed to add to stream' });
   }
 });
 
-app.get('/redis/xread/:queueName', async (req, res) => {
+// Task processing endpoint with retries
+app.post('/process-task', async (req, res) => {
+  const { taskId } = req.body;
+  
+  try {
+    const taskKey = getTaskKey(taskId);
+    const taskStatusKey = getTaskStatusKey(taskId);
+    
+    // Get task details
+    const task = await redis.hgetall(taskKey);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    // Check if task is already being processed
+    const currentStatus = await redis.get(taskStatusKey);
+    if (currentStatus === 'processing') {
+      return res.status(200).json({ message: 'Task is already being processed' });
+    }
+
+    // Mark as processing
+    await redis.set(taskStatusKey, 'processing');
+
+    const { prompt, aspectRatio, retries = 0 } = task;
+    
     try {
-      const { queueName } = req.params;
-      const streamData = await redis.xread('COUNT', 1, 'STREAMS', queueName, '>');
-      if (!streamData || streamData.length === 0 || streamData[0][1].length === 0) {
-        return res.status(200).json({ value: null });
-      }
-      const value = streamData[0][1][0][1];
-      res.status(200).json({ value: value ? JSON.parse(value) : null });
-    } catch (error) {
-      console.error('Redis xread error:', error);
-      res.status(500).json({ error: 'Failed to read from stream' });
-    }
-  });
+      const myHeaders = new Headers();
+      myHeaders.append("x-api-key", process.env.VITE_GOAPI_KEY || "");
+      myHeaders.append("Content-Type", "application/json");
 
-const RATE_LIMIT_WINDOW = 60; // 1 minute
-const RATE_LIMIT_MAX = 5; // 5 requests per minute
-
-const rateLimit = async (req, res, next) => {
-  const userId = req.headers['user-id'] || 'anonymous'; // Or extract user ID from JWT
-  const key = `rate_limit:${userId}`;
-
-  try {
-    const tokens = await redis.get(key);
-    let currentTokens = tokens ? parseInt(tokens, 10) : RATE_LIMIT_MAX;
-
-    if (currentTokens <= 0) {
-      return res.status(429).json({ error: 'Too many requests' });
-    }
-
-    currentTokens--;
-    await redis.set(key, currentTokens, 'EX', RATE_LIMIT_WINDOW);
-    next();
-  } catch (error) {
-    console.error('Rate limiting error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-};
-
-// Task processing endpoint
-app.post('/process-task', rateLimit, async (req, res) => {
-  try {
-    const streamData = await redis.xread('COUNT', 1, 'STREAMS', 'image_generation_tasks', '>');
-    if (!streamData || streamData.length === 0 || streamData[0][1].length === 0) {
-      return res.status(200).json({ message: 'No tasks in queue' });
-    }
-    const task = streamData[0][1][0][1];
-    const parsedTask = JSON.parse(task);
-    const { prompt, aspectRatio } = parsedTask;
-
-    const myHeaders = new Headers();
-    myHeaders.append("x-api-key", process.env.VITE_GOAPI_KEY || "");
-    myHeaders.append("Content-Type", "application/json");
-
-    const response = await fetch("https://api.goapi.ai/api/v1/task", {
-      method: "POST",
-      headers: myHeaders,
-      body: JSON.stringify({
-        model: "midjourney",
-        task_type: "imagine",
-        input: {
-          prompt,
-          aspect_ratio: aspectRatio,
-          process_mode: "fast",
-          skip_prompt_check: false,
-          bot_id: 0,
-        },
-        config: {
-          service_mode: "",
-          webhook_config: {
-            endpoint: "",
-            secret: "",
+      const response = await fetch("https://api.goapi.ai/api/v1/task", {
+        method: "POST",
+        headers: myHeaders,
+        body: JSON.stringify({
+          model: "midjourney",
+          task_type: "imagine",
+          input: {
+            prompt,
+            aspect_ratio: aspectRatio,
+            process_mode: "fast",
+            skip_prompt_check: false,
+            bot_id: 0,
           },
-        },
-      }),
-    });
+          config: {
+            service_mode: "",
+            webhook_config: {
+              endpoint: "",
+              secret: "",
+            },
+          },
+        }),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Failed to create task: ${response.statusText}`);
+      if (!response.ok) {
+        throw new Error(`Failed to create task: ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+      if (responseData.code !== 200) {
+        throw new Error(responseData.data.error?.message || "Failed to create task");
+      }
+
+      // Update task status
+      await redis.hset(taskKey, {
+        status: 'completed',
+        completedAt: Date.now(),
+        result: JSON.stringify(responseData)
+      });
+
+      await redis.set(taskStatusKey, 'completed');
+      
+      res.status(200).json({ 
+        message: 'Task processed successfully',
+        taskId: responseData.data.task_id
+      });
+
+    } catch (error) {
+      console.error('Task processing error:', error);
+      
+      // Handle retries
+      if (retries < MAX_RETRIES) {
+        const delay = RETRY_DELAYS[retries];
+        const newRetries = parseInt(retries) + 1;
+        
+        await redis.hset(taskKey, {
+          status: 'retrying',
+          retries: newRetries
+        });
+
+        // Schedule retry
+        setTimeout(async () => {
+          await redis.zadd(getTaskQueueKey(task.priority), task.priority, taskId);
+        }, delay);
+
+        return res.status(200).json({ 
+          message: `Task will be retried in ${delay}ms`,
+          retries: newRetries
+        });
+      }
+
+      // Mark as failed after max retries
+      await redis.hset(taskKey, {
+        status: 'failed',
+        error: error.message
+      });
+
+      await redis.set(taskStatusKey, 'failed');
+      
+      res.status(500).json({ 
+        error: 'Task failed after maximum retries',
+        taskId
+      });
     }
-
-    const responseData = await response.json();
-    if (responseData.code !== 200) {
-      throw new Error(responseData.data.error?.message || "Failed to create task");
-    }
-
-    // Cache the task ID
-    await redis.set(
-      `task_status:${responseData.data.task_id}`,
-      {
-        code: responseData.code,
-        data: {
-          status: responseData.data.status,
-          output: responseData.data.output,
-          error: responseData.data.error,
-        },
-        message: responseData.message,
-      },
-      60 * 60
-    );
-
-    res.status(200).json({ message: 'Task processed successfully', taskId: responseData.data.task_id });
   } catch (error) {
     console.error('Error processing task:', error);
     res.status(500).json({ error: 'Failed to process task' });
+  }
+});
+
+// Task status endpoint
+app.get('/task-status/:taskId', async (req, res) => {
+  try {
+    const { taskId } = req.params;
+    const taskKey = getTaskKey(taskId);
+    const taskStatusKey = getTaskStatusKey(taskId);
+
+    const task = await redis.hgetall(taskKey);
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+
+    const status = await redis.get(taskStatusKey);
+    res.status(200).json({ 
+      ...task,
+      currentStatus: status
+    });
+  } catch (error) {
+    console.error('Error getting task status:', error);
+    res.status(500).json({ error: 'Failed to get task status' });
   }
 });
 
@@ -208,3 +212,22 @@ app.post('/process-task', rateLimit, async (req, res) => {
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
+
+// Task cleanup worker
+setInterval(async () => {
+  try {
+    // Clean up completed tasks older than 24 hours
+    const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+    const tasks = await redis.keys('task:*');
+    
+    for (const taskKey of tasks) {
+      const task = await redis.hgetall(taskKey);
+      if (task.status === 'completed' && task.completedAt < cutoff) {
+        await redis.del(taskKey);
+        await redis.del(getTaskStatusKey(taskKey.split(':')[1]));
+      }
+    }
+  } catch (error) {
+    console.error('Task cleanup error:', error);
+  }
+}, 60 * 60 * 1000); // Run every hour

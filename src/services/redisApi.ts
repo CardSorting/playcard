@@ -23,20 +23,24 @@ export const redisApi = {
     });
   },
 
-  async enqueue(queueName: string, value: Record<string, any>): Promise<void> {
+  async enqueue(queueName: string, value: Record<string, any>, priority: number = 2): Promise<string> {
     // Convert object to field-value pairs array
     const fieldValuePairs = Object.entries(value).flat();
     
-    await fetch(`${API_BASE_URL}/redis/xadd`, {
+    const response = await fetch(`${API_BASE_URL}/redis/xadd`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         queueName,
-        fieldValuePairs
+        fieldValuePairs,
+        priority
       }),
     });
+    
+    const result = await response.json();
+    return result.taskId;
   },
 
   async dequeue(queueName: string): Promise<any> {
@@ -44,4 +48,43 @@ export const redisApi = {
     const data = await response.json();
     return data.value;
   },
+
+  async getTaskStatus(taskId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/task-status/${taskId}`);
+    return response.json();
+  },
+
+  async processTask(taskId: string): Promise<any> {
+    const response = await fetch(`${API_BASE_URL}/process-task`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ taskId }),
+    });
+    return response.json();
+  },
+
+  async cancelTask(taskId: string): Promise<void> {
+    await fetch(`${API_BASE_URL}/task/${taskId}/cancel`, {
+      method: 'POST',
+    });
+  },
+
+  async retryTask(taskId: string): Promise<void> {
+    await fetch(`${API_BASE_URL}/task/${taskId}/retry`, {
+      method: 'POST',
+    });
+  },
+
+  async getTaskHistory(queueName: string, limit: number = 100): Promise<any[]> {
+    const response = await fetch(`${API_BASE_URL}/task-history/${queueName}?limit=${limit}`);
+    return response.json();
+  }
+};
+
+export const TaskPriorities = {
+  LOW: 1,
+  NORMAL: 2,
+  HIGH: 3
 };
