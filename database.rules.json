@@ -5,7 +5,7 @@
     "imageGenerationTasks": {
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId || (auth != null && auth.token.role == 'system' && newData.hasChildren(['status', 'progress', 'updatedAt']))",
         "$taskId": {
           ".validate": "newData.hasChildren(['id', 'prompt', 'status'])",
           "id": {
