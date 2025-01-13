@@ -1,16 +1,18 @@
-import { db } from '@/lib/firebase';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { getDatabase, ref, set, onValue } from 'firebase/database';
+import { app } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 
 const API_URL = 'https://api.goapi.ai/api/v1/task';
 const API_KEY = import.meta.env.VITE_GOAPI_KEY;
+
+const db = getDatabase(app);
 
 // In-memory task status cache
 const taskStatusCache = new Map<string, any>();
 
 export const generateImageTask = async (prompt: string, aspectRatio: string) => {
   const taskId = uuidv4();
-  const taskRef = doc(db, 'imageGenerationTasks', taskId);
+  const taskRef = ref(db, `imageGenerationTasks/${taskId}`);
   
   // Create initial task document
   const taskData = {
@@ -19,11 +21,11 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
     aspectRatio,
     status: 'pending',
     progress: 0,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+    createdAt: Date.now(),
+    updatedAt: Date.now()
   };
 
-  await setDoc(taskRef, taskData);
+  await set(taskRef, taskData);
   taskStatusCache.set(taskId, taskData);
 
   try {
@@ -56,9 +58,9 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
       ...taskData,
       status: 'processing',
       progress: 50,
-      updatedAt: new Date().toISOString()
+      updatedAt: Date.now()
     };
-    await setDoc(taskRef, processingData);
+    await set(taskRef, processingData);
     taskStatusCache.set(taskId, processingData);
 
     // Make API request
@@ -80,10 +82,10 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
       status: 'completed',
       progress: 100,
       imageUrl: result.image_url || '',
-      updatedAt: new Date().toISOString()
+      updatedAt: Date.now()
     };
     
-    await setDoc(taskRef, completedData);
+    await set(taskRef, completedData);
     taskStatusCache.set(taskId, completedData);
 
     return {
@@ -98,10 +100,10 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
       ...taskData,
       status: 'failed',
       error: error instanceof Error ? error.message : 'Unknown error',
-      updatedAt: new Date().toISOString()
+      updatedAt: Date.now()
     };
     
-    await setDoc(taskRef, errorData);
+    await set(taskRef, errorData);
     taskStatusCache.set(taskId, errorData);
 
     throw error;
@@ -113,12 +115,12 @@ export const getTaskStatus = (taskId: string) => {
 };
 
 export const subscribeToTaskUpdates = (taskId: string, callback: (task: any) => void) => {
-  const taskRef = doc(db, 'imageGenerationTasks', taskId);
+  const taskRef = ref(db, `imageGenerationTasks/${taskId}`);
   
   // Return unsubscribe function
-  return onSnapshot(taskRef, (doc) => {
-    if (doc.exists()) {
-      const taskData = doc.data();
+  return onValue(taskRef, (snapshot) => {
+    if (snapshot.exists()) {
+      const taskData = snapshot.val();
       taskStatusCache.set(taskId, taskData);
       callback(taskData);
     }

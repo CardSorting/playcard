@@ -1,0 +1,27 @@
+{
+  "rules": {
+    "imageGenerationTasks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        "$taskId": {
+          "prompt": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
+          },
+          "status": {
+            ".validate": "newData.isString() && ['pending', 'processing', 'completed', 'failed'].includes(newData.val())"
+          },
+          "progress": {
+            ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
+          },
+          "createdAt": {
+            ".validate": "newData.isNumber() && newData.val() <= now"
+          },
+          "updatedAt": {
+            ".validate": "newData.isNumber() && newData.val() <= now"
+          }
+        }
+      }
+    }
+  }
+}

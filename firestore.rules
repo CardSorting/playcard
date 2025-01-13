@@ -682,6 +682,7 @@ match /packTemplates/{templateId} {
       allow delete: if false;
     }
 
+
     // claims rules
     match /claimPools/{poolId} {
       allow read: if isAuthenticated();
