@@ -1,66 +1,36 @@
-import Redis from 'ioredis';
+import InMemoryBroker from './inMemoryBroker';
 
 class RedisClient {
   constructor() {
-    this.client = new Redis(process.env.REDIS_URL || process.env.VITE_REDIS_URL || 'redis://localhost:6379');
-    this.initEventHandlers();
-  }
-
-  initEventHandlers() {
-    this.client.on('connect', () => {
-      console.log('Connected to Redis');
-    });
-
-    this.client.on('error', (err) => {
-      console.error('Redis connection error:', err);
-    });
-  }
-
-  decodeKey(key) {
-    try {
-      return decodeURIComponent(key);
-    } catch (error) {
-      console.error('Error decoding Redis key:', key, error);
-      return key;
-    }
+    this.client = InMemoryBroker;
   }
 
   async hset(key, fieldValues) {
-    const decodedKey = this.decodeKey(key);
-    return this.client.hset(decodedKey, fieldValues);
+    return this.client.hset(key, fieldValues);
   }
 
   async hgetall(key) {
-    const decodedKey = this.decodeKey(key);
-    return this.client.hgetall(decodedKey);
+    return this.client.hgetall(key);
   }
 
   async get(key) {
-    const decodedKey = this.decodeKey(key);
-    return this.client.get(decodedKey);
+    return this.client.get(key);
   }
 
   async set(key, value, ttl) {
-    const decodedKey = this.decodeKey(key);
-    if (ttl) {
-      return this.client.set(decodedKey, value, 'EX', ttl);
-    }
-    return this.client.set(decodedKey, value);
+    return this.client.set(key, value);
   }
 
   async del(key) {
-    const decodedKey = this.decodeKey(key);
-    return this.client.del(decodedKey);
+    return this.client.del(key);
   }
 
   async zadd(queue, priority, taskId) {
-    const decodedQueue = this.decodeKey(queue);
-    return this.client.zadd(decodedQueue, priority, taskId);
+    return this.client.zadd(queue, priority, taskId);
   }
 
   async keys(pattern) {
-    const decodedPattern = this.decodeKey(pattern);
-    return this.client.keys(decodedPattern);
+    return this.client.keys(pattern);
   }
 }
 
