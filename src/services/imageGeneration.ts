@@ -1,4 +1,3 @@
-import axios from "axios";
 import { redisApi } from "./redisApi";
 
 interface TaskOutput {
@@ -8,9 +7,21 @@ interface TaskOutput {
 }
 
 interface TaskResponse {
-  task_id: string;
-  status: string;
-  output?: TaskOutput;
+  code: number;
+  data: {
+    task_id: string;
+    model: string;
+    task_type: string;
+    status: "Completed" | "Processing" | "Pending" | "Failed" | "Staged";
+    input: Record<string, any>;
+    output: TaskOutput;
+    error: {
+      code: number;
+      message: string;
+      detail: any;
+    };
+  };
+  message: string;
 }
 
 const TASK_CACHE_TTL = 60 * 60; // 1 hour
@@ -33,9 +44,14 @@ export const generateImageTask = async (prompt: string, aspectRatio: string): Pr
   await redisApi.enqueue(TASK_QUEUE_NAME, task);
   
   // Process task immediately
-  const response = await axios.post(
-    "https://api.goapi.ai/api/v1/task",
-    {
+  const myHeaders = new Headers();
+  myHeaders.append("x-api-key", import.meta.env.VITE_GOAPI_KEY || "");
+  myHeaders.append("Content-Type", "application/json");
+
+  const response = await fetch("https://api.goapi.ai/api/v1/task", {
+    method: "POST",
+    headers: myHeaders,
+    body: JSON.stringify({
       model: "midjourney",
       task_type: "imagine",
       input: {
@@ -52,23 +68,26 @@ export const generateImageTask = async (prompt: string, aspectRatio: string): Pr
           secret: "",
         },
       },
-    },
-    {
-      headers: {
-        "x-api-key": import.meta.env.VITE_GOAPI_KEY || "",
-        "Content-Type": "application/json",
-      },
-    }
-  );
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create task: ${response.statusText}`);
+  }
+
+  const responseData = await response.json();
+  if (responseData.code !== 200) {
+    throw new Error(responseData.data.error?.message || "Failed to create task");
+  }
 
   // Cache the task ID
   await redisApi.set(
     `${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`,
-    { task_id: response.data.task_id },
+    { task_id: responseData.data.task_id },
     TASK_CACHE_TTL
   );
 
-  return response.data.task_id;
+  return responseData.data.task_id;
 };
 
 export const pollTaskStatus = async (taskId: string): Promise<TaskResponse> => {
@@ -78,22 +97,29 @@ export const pollTaskStatus = async (taskId: string): Promise<TaskResponse> => {
     return cachedStatus;
   }
 
-  const response = await axios.get(
-    `https://api.goapi.ai/api/v1/task/${taskId}`,
-    {
-      headers: {
-        "x-api-key": import.meta.env.VITE_GOAPI_KEY || "",
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const myHeaders = new Headers();
+  myHeaders.append("x-api-key", import.meta.env.VITE_GOAPI_KEY || "");
+
+  const response = await fetch(`https://api.goapi.ai/api/v1/task/${taskId}`, {
+    method: "GET",
+    headers: myHeaders,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch task status: ${response.statusText}`);
+  }
+
+  const responseData = await response.json();
+  if (responseData.code !== 200) {
+    throw new Error(responseData.data.error?.message || "Failed to fetch task status");
+  }
 
   // Cache the status
   await redisApi.set(
     `task_status:${taskId}`,
-    response.data,
+    responseData,
     TASK_CACHE_TTL
   );
 
-  return response.data;
+  return responseData;
 };
