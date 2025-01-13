@@ -1,7 +1,11 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
-import { getStorage, connectStorageEmulator } from 'firebase/storage';
+import { 
+  getAuth, 
+  setPersistence,
+  browserSessionPersistence
+} from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,9 +22,26 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 
-// Connect to emulators in development
-if (typeof __USE_EMULATORS__ !== 'undefined' && __USE_EMULATORS__) {
-  connectAuthEmulator(auth, 'http://localhost:9099');
-  connectFirestoreEmulator(db, 'localhost', 8080);
-  connectStorageEmulator(storage, 'localhost', 9199);
-}
+// Configure auth persistence
+setPersistence(auth, browserSessionPersistence)
+  .then(() => {
+    console.log('Auth persistence set to session');
+  })
+  .catch((error) => {
+    console.error('Error setting auth persistence:', error);
+  });
+
+// Add token refresh listener
+auth.onIdTokenChanged(async (user) => {
+  if (user) {
+    try {
+      const token = await user.getIdToken();
+      // Store token for API requests
+      localStorage.setItem('firebaseToken', token);
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+    }
+  } else {
+    localStorage.removeItem('firebaseToken');
+  }
+});

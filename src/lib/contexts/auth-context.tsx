@@ -8,31 +8,20 @@ import { db } from '../firebase';
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  token: string | null;
 }
 
-const AUTH_STORAGE_KEY = 'firebaseAuthState';
-
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
-
-// Helper function to persist auth state
-const persistAuthState = (user: User | null) => {
-  if (user) {
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(user));
-  } else {
-    localStorage.removeItem(AUTH_STORAGE_KEY);
-  }
-};
-
-// Helper function to get persisted auth state
-const getPersistedAuthState = (): User | null => {
-  const user = localStorage.getItem(AUTH_STORAGE_KEY);
-  return user ? JSON.parse(user) : null;
-};
+const AuthContext = createContext<AuthContextType>({ 
+  user: null, 
+  loading: true,
+  token: null
+});
 
 export const useAuth = () => useContext(AuthContext);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
@@ -77,19 +66,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Check for persisted auth state first
-    const persistedUser = getPersistedAuthState();
-    if (persistedUser) {
-      setUser(persistedUser);
-      setLoading(false);
-    }
-
     // Handle redirect result
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
           await initializeUserData(result.user);
-          persistAuthState(result.user);
+          const token = await result.user.getIdToken();
+          setToken(token);
           setUser(result.user);
           navigate('/');
         }
@@ -104,9 +87,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         await initializeUserData(user);
-        persistAuthState(user);
+        try {
+          const token = await user.getIdToken();
+          setToken(token);
+        } catch (error) {
+          console.error('Error getting token:', error);
+          setToken(null);
+        }
       } else {
-        persistAuthState(null);
+        setToken(null);
       }
       setUser(user);
       setLoading(false);
@@ -116,7 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [navigate]);
 
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, token }}>
       {children}
     </AuthContext.Provider>
   );
