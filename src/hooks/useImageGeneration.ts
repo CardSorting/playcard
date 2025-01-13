@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 const INITIAL_POLL_INTERVAL = 5000; // 5 seconds
 const MAX_POLL_INTERVAL = 30000; // 30 seconds
 const MAX_RETRIES = 5;
-const API_BASE_URL = 'http://localhost:3001'; // Changed from 127.0.0.1
+const API_BASE_URL = 'http://localhost:3001';
 
 interface GenerationResult {
   taskId: string;
@@ -48,7 +48,10 @@ export default function useImageGeneration() {
 
     try {
       const taskId = await generateImageTask(prompt, aspectRatio);
+      console.log('Received task ID:', taskId);
+      
       if (!validateTaskId(taskId)) {
+        console.error('Invalid task ID format:', taskId);
         throw new Error("Invalid task ID received");
       }
 
@@ -73,7 +76,8 @@ export default function useImageGeneration() {
   };
 
   const validateTaskId = (taskId: string): boolean => {
-    return /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(taskId);
+    // More lenient validation - just check if it's a non-empty string
+    return typeof taskId === 'string' && taskId.trim().length > 0;
   };
 
   const pollForResult = async (
