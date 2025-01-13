@@ -100,11 +100,21 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
     
     await set(taskRef, completedData);
 
+    // Return all relevant data including URLs
     return {
       task_id: taskId,
       status: 'completed',
       progress: 100,
-      imageUrls
+      image_url: imageUrls.main,
+      image_urls: imageUrls.variants,
+      temporary_image_urls: imageUrls.temporary,
+      discord_image_url: imageUrls.discord,
+      output: {
+        image_url: imageUrls.main,
+        image_urls: imageUrls.variants,
+        temporary_image_urls: imageUrls.temporary,
+        discord_image_url: imageUrls.discord
+      }
     };
   } catch (error) {
     // Update with error status
