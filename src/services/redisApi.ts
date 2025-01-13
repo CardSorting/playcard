@@ -23,19 +23,25 @@ export const redisApi = {
     });
   },
 
-  async enqueue(queueName: string, value: any): Promise<void> {
+  async enqueue(queueName: string, value: Record<string, any>): Promise<void> {
+    // Convert object to field-value pairs array
+    const fieldValuePairs = Object.entries(value).flat();
+    
     await fetch(`${API_BASE_URL}/redis/xadd`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ queueName, value }),
+      body: JSON.stringify({
+        queueName,
+        fieldValuePairs
+      }),
     });
   },
 
   async dequeue(queueName: string): Promise<any> {
-      const response = await fetch(`${API_BASE_URL}/redis/xread/${queueName}`);
-      const data = await response.json();
-      return data.value;
+    const response = await fetch(`${API_BASE_URL}/redis/xread/${queueName}`);
+    const data = await response.json();
+    return data.value;
   },
 };

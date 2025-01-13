@@ -87,8 +87,8 @@ app.get('/redis/dequeue/:queueName', async (req, res) => {
 
 app.post('/redis/xadd', async (req, res) => {
   try {
-    const { queueName, value } = req.body;
-    await redis.xadd(queueName, '*', JSON.stringify(value));
+    const { queueName, fieldValuePairs } = req.body;
+    await redis.xadd(queueName, '*', ...fieldValuePairs);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Redis xadd error:', error);
