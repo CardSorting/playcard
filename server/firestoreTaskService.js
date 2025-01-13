@@ -1,5 +1,6 @@
 import { db } from './firebase.js';
 import { Timestamp } from 'firebase-admin/firestore';
+import { randomUUID } from 'crypto';
 
 const TASK_COLLECTION = 'tasks';
 const TASK_STATUS_COLLECTION = 'taskStatuses';
@@ -7,7 +8,7 @@ const TASK_STATUS_COLLECTION = 'taskStatuses';
 class FirestoreTaskService {
   async createTask(prompt, aspectRatio) {
     try {
-      const taskId = crypto.randomUUID();
+      const taskId = randomUUID();
       const now = Timestamp.now();
       
       const taskData = {
