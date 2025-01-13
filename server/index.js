@@ -5,8 +5,16 @@ import Redis from 'ioredis';
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Initialize Redis client
-const redis = new Redis(process.env.REDIS_URL);
+// Initialize Redis client with proper error handling
+const redis = new Redis(process.env.VITE_REDIS_URL || 'redis://localhost:6379');
+
+redis.on('connect', () => {
+  console.log('Connected to Redis');
+});
+
+redis.on('error', (err) => {
+  console.error('Redis connection error:', err);
+});
 
 // Middleware
 app.use(cors());
