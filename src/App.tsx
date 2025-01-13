@@ -47,11 +47,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Initialize Firebase component
 const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { user, loading, initialized } = useAuth();
   const [firestoreInitialized, setFirestoreInitialized] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
+    // Only attempt initialization when auth is fully initialized
+    if (!initialized || loading) return;
+
     const initialize = async () => {
       try {
         const initialized = await initializeFirestore();
@@ -66,9 +69,9 @@ const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
     };
 
     initialize();
-  }, [user, loading]);
+  }, [user, loading, initialized]);
 
-  if (loading) {
+  if (loading || !initialized) {
     return <div>Loading authentication...</div>;
   }
 

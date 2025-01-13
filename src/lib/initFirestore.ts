@@ -13,18 +13,21 @@ export const COLLECTIONS = {
 // Initialize Firestore and verify authentication
 export const initializeFirestore = async () => {
   try {
-    // Verify user document exists
+    console.log('Attempting Firestore initialization...');
     const user = auth.currentUser;
+    
     if (!user) {
       console.log('No authenticated user - skipping Firestore initialization');
       return false;
     }
 
+    console.log('Authenticated user found:', user.uid);
+    
     const userRef = doc(db, 'users', user.uid);
     const userDoc = await getDoc(userRef);
     
     if (!userDoc.exists()) {
-      // Create user document if it doesn't exist
+      console.log('Creating new user document for:', user.uid);
       await setDoc(userRef, {
         email: user.email,
         displayName: user.displayName,
@@ -32,9 +35,11 @@ export const initializeFirestore = async () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
+    } else {
+      console.log('User document already exists for:', user.uid);
     }
 
-    console.log('Firestore initialized successfully');
+    console.log('Firestore initialized successfully for user:', user.uid);
     return true;
   } catch (error) {
     console.error('Error initializing Firestore:', error);

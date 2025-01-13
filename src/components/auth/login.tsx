@@ -27,7 +27,14 @@ export default function Login() {
       // Successful login will trigger auth state change and redirect
     } catch (error: any) {
       console.error("Error signing in with Google:", error);
-      setError(error.message || "Failed to sign in. Please try again.");
+      
+      // Handle Cross-Origin-Opener-Policy error specifically
+      if (error.code === 'auth/popup-closed-by-user' || 
+          error.message.includes('Cross-Origin-Opener-Policy')) {
+        setError("Please allow popups for this site to sign in.");
+      } else {
+        setError(error.message || "Failed to sign in. Please try again.");
+      }
     } finally {
       setIsSigningIn(false);
     }
