@@ -1,6 +1,6 @@
 import { collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { redis } from "@/lib/redis";
+import { redisApi } from "./redisApi";
 
 export interface StoredGeneration {
   id: string;
@@ -33,7 +33,7 @@ export const storeGeneration = async (
     const docRef = await addDoc(generationsRef, generationData);
     
     // Cache in Redis
-    await redis.set(
+    await redisApi.set(
       `generation:${userId}:${docRef.id}`,
       { ...generationData, id: docRef.id },
       GENERATION_CACHE_TTL
@@ -47,7 +47,7 @@ export const storeGeneration = async (
 export const loadPreviousGenerations = async (userId: string): Promise<StoredGeneration[]> => {
   try {
     // Try to get from Redis cache first
-    const cachedGenerations = await redis.get(`generations:${userId}`);
+    const cachedGenerations = await redisApi.get(`generations:${userId}`);
     if (cachedGenerations) {
       return cachedGenerations;
     }
@@ -68,7 +68,7 @@ export const loadPreviousGenerations = async (userId: string): Promise<StoredGen
     })) as StoredGeneration[];
 
     // Cache results in Redis
-    await redis.set(
+    await redisApi.set(
       `generations:${userId}`,
       generations,
       GENERATION_CACHE_TTL

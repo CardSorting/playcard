@@ -1,5 +1,5 @@
 import axios from "axios";
-import { redis } from "../lib/redis";
+import { redisApi } from "./redisApi";
 
 interface TaskOutput {
   image_url: string;
@@ -18,7 +18,7 @@ const TASK_QUEUE_NAME = "image_generation_tasks";
 
 export const generateImageTask = async (prompt: string, aspectRatio: string): Promise<string> => {
   // Check if task is already in queue
-  const existingTask = await redis.get(`${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`);
+  const existingTask = await redisApi.get(`${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`);
   if (existingTask) {
     return existingTask.task_id;
   }
@@ -30,7 +30,7 @@ export const generateImageTask = async (prompt: string, aspectRatio: string): Pr
   };
 
   // Add task to queue
-  await redis.enqueue(TASK_QUEUE_NAME, task);
+  await redisApi.enqueue(TASK_QUEUE_NAME, task);
   
   // Process task immediately
   const response = await axios.post(
@@ -62,7 +62,7 @@ export const generateImageTask = async (prompt: string, aspectRatio: string): Pr
   );
 
   // Cache the task ID
-  await redis.set(
+  await redisApi.set(
     `${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`,
     { task_id: response.data.task_id },
     TASK_CACHE_TTL
@@ -73,7 +73,7 @@ export const generateImageTask = async (prompt: string, aspectRatio: string): Pr
 
 export const pollTaskStatus = async (taskId: string): Promise<TaskResponse> => {
   // Check cache first
-  const cachedStatus = await redis.get(`task_status:${taskId}`);
+  const cachedStatus = await redisApi.get(`task_status:${taskId}`);
   if (cachedStatus) {
     return cachedStatus;
   }
@@ -89,7 +89,7 @@ export const pollTaskStatus = async (taskId: string): Promise<TaskResponse> => {
   );
 
   // Cache the status
-  await redis.set(
+  await redisApi.set(
     `task_status:${taskId}`,
     response.data,
     TASK_CACHE_TTL
