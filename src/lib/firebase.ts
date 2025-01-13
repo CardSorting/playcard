@@ -36,12 +36,12 @@ auth.onIdTokenChanged(async (user) => {
   if (user) {
     try {
       const token = await user.getIdToken();
-      // Store token for API requests
-      localStorage.setItem('firebaseToken', token);
+      // Store token in sessionStorage to match auth context
+      sessionStorage.setItem('firebaseToken', token);
     } catch (error) {
       console.error('Error refreshing token:', error);
     }
   } else {
-    localStorage.removeItem('firebaseToken');
+    sessionStorage.removeItem('firebaseToken');
   }
 });
