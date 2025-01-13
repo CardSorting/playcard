@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export default function ImageGenerator() {
   const [prompt, setPrompt] = useState("");
-  const [aspectRatio, setAspectRatio] = useState("16:9");
+  const [aspectRatio, setAspectRatio] = useState("9:16");
   const [showHistory, setShowHistory] = useState(false);
   const { isGenerating, result, handleGenerate } = useImageGeneration();
   const { user } = useAuth();

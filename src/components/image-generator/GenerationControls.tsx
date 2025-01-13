@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, ImageIcon, History } from "lucide-react";
 import ExamplePrompts from "./ExamplePrompts";
+import { cn } from "@/lib/utils";
 
 interface GenerationControlsProps {
   prompt: string;
@@ -33,17 +34,51 @@ export function GenerationControls({
   onGenerate,
   onToggleHistory,
 }: GenerationControlsProps) {
+  const [textareaHeight, setTextareaHeight] = useState("auto");
+  const [isFocused, setIsFocused] = useState(false);
+  const maxLength = 500;
+
+  const handlePromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    if (e.target.value.length <= maxLength) {
+      onPromptChange(e.target.value);
+    }
+  };
+
+  useEffect(() => {
+    const textarea = document.getElementById("prompt-textarea");
+    if (textarea) {
+      textarea.style.height = "auto";
+      const newHeight = Math.min(textarea.scrollHeight, 200);
+      textarea.style.height = `${newHeight}px`;
+      setTextareaHeight(`${newHeight}px`);
+    }
+  }, [prompt]);
+
   return (
     <div className="space-y-8">
       <div className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="prompt">Prompt</Label>
-          <Input
-            id="prompt"
+          <div className="flex justify-between items-end">
+            <Label htmlFor="prompt-textarea">Prompt</Label>
+            <span className={cn(
+              "text-sm",
+              prompt.length > maxLength * 0.9 ? "text-red-400" : "text-gray-400"
+            )}>
+              {prompt.length}/{maxLength}
+            </span>
+          </div>
+          <Textarea
+            id="prompt-textarea"
             placeholder="Describe the image you want to generate..."
             value={prompt}
-            onChange={(e) => onPromptChange(e.target.value)}
-            className="bg-white/5 border-gray-700 text-white"
+            onChange={handlePromptChange}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            className={cn(
+              "bg-white/5 border-gray-700 text-white min-h-[120px] resize-none transition-all duration-300",
+              isFocused ? "ring-2 ring-yellow-400/50" : ""
+            )}
+            style={{ height: textareaHeight }}
           />
         </div>
 
@@ -68,7 +103,7 @@ export function GenerationControls({
           <Button
             className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black"
             onClick={onGenerate}
-            disabled={!prompt || isGenerating}
+            disabled={!prompt || isGenerating || prompt.length > maxLength}
           >
             {isGenerating ? (
               <>
