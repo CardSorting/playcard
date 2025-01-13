@@ -1,37 +1,52 @@
 {
   "rules": {
     "imageGenerationTasks": {
-      "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid",
+      "$userId": {
+        ".read": "auth != null && auth.uid == $userId",
+        ".write": "auth != null && auth.uid == $userId",
         "$taskId": {
-          ".validate": "newData.hasChildren(['id', 'prompt', 'status', 'progress', 'createdAt', 'updatedAt'])",
+          ".validate": "newData.hasChildren(['id', 'prompt', 'aspectRatio', 'processMode', 'status', 'progress', 'createdAt', 'updatedAt'])",
           "id": {
-            ".validate": "newData.isString() && newData.val() == $taskId"
+            ".validate": "newData.isString() && newData.val().matches(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$/)"
           },
           "prompt": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
           },
+          "aspectRatio": {
+            ".validate": "newData.isString() && newData.val().matches(/^\\d+:\\d+$/)"
+          },
+          "processMode": {
+            ".validate": "newData.isString() && newData.val().matches(/^(relax|fast|turbo)$/)"
+          },
           "status": {
-            ".validate": "newData.isString() && (newData.val() == 'pending' || newData.val() == 'processing' || newData.val() == 'completed' || newData.val() == 'failed')"
+            ".validate": "newData.isString() && newData.val().matches(/^(pending|processing|completed|failed)$/)"
           },
           "progress": {
             ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
           },
           "createdAt": {
-            ".validate": "newData.isNumber() && newData.val() <= now"
+            ".validate": "newData.isNumber() && newData.val() > 0"
           },
           "updatedAt": {
-            ".validate": "newData.isNumber() && newData.val() <= now"
+            ".validate": "newData.isNumber() && newData.val() > 0"
           },
-          "aspectRatio": {
-            ".validate": "newData.isString()"
-          },
-          "imageUrl": {
-            ".validate": "newData.isString() || newData.val() == null"
+          "imageUrls": {
+            ".validate": "newData.hasChildren(['main', 'variants', 'temporary', 'discord'])",
+            "main": {
+              ".validate": "newData.isString() && newData.val().length > 0"
+            },
+            "variants": {
+              ".validate": "newData.isString()"
+            },
+            "temporary": {
+              ".validate": "newData.isString()"
+            },
+            "discord": {
+              ".validate": "newData.isString()"
+            }
           },
           "error": {
-            ".validate": "newData.isString() || newData.val() == null"
+            ".validate": "newData.isString() && newData.val().length <= 500"
           }
         }
       }
