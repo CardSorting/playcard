@@ -23,13 +23,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: [
-        'firebase-admin',
-        'fs',
-        'path',
-        'url',
-        /^node:/
-      ]
+      external: []
     }
   },
   optimizeDeps: {
