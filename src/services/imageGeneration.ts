@@ -81,12 +81,20 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
 
     const result = await response.json();
 
+    // Extract all image URLs from response
+    const imageUrls = {
+      main: result.output?.image_url || '',
+      variants: result.output?.image_urls || [],
+      temporary: result.output?.temporary_image_urls || [],
+      discord: result.output?.discord_image_url || ''
+    };
+
     // Update with completed data
     const completedData = {
       ...processingData,
       status: 'completed',
       progress: 100,
-      imageUrl: result.image_url || '',
+      imageUrls,
       updatedAt: Date.now()
     };
     
@@ -96,7 +104,7 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
       task_id: taskId,
       status: 'completed',
       progress: 100,
-      imageUrl: completedData.imageUrl
+      imageUrls
     };
   } catch (error) {
     // Update with error status
