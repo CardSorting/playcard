@@ -21,6 +21,17 @@ export default defineConfig({
       "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
     }
   },
+  build: {
+    rollupOptions: {
+      external: [
+        'firebase-admin',
+        'fs',
+        'path',
+        'url',
+        /^node:/
+      ]
+    }
+  },
   optimizeDeps: {
     entries: ["src/main.tsx", "src/tempobook/**/*"],
     include: ["@mui/material", "@mui/icons-material"],
