@@ -1,18 +1,28 @@
 import { getDatabase, ref, set, onValue } from 'firebase/database';
-import { app } from '@/lib/firebase';
+import { app, auth } from '@/lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
+import { User } from 'firebase/auth';
 
 const API_URL = 'https://api.goapi.ai/api/v1/task';
 const API_KEY = import.meta.env.VITE_GOAPI_KEY;
 
 const db = getDatabase(app);
 
+async function getCurrentUser(): Promise<User> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+  return user;
+}
+
 // In-memory task status cache
 const taskStatusCache = new Map<string, any>();
 
 export const generateImageTask = async (prompt: string, aspectRatio: string) => {
+  const user = await getCurrentUser();
   const taskId = uuidv4();
-  const taskRef = ref(db, `imageGenerationTasks/${taskId}`);
+  const taskRef = ref(db, `imageGenerationTasks/${user.uid}/${taskId}`);
   
   // Create initial task document
   const taskData = {
@@ -115,7 +125,11 @@ export const getTaskStatus = (taskId: string) => {
 };
 
 export const subscribeToTaskUpdates = (taskId: string, callback: (task: any) => void) => {
-  const taskRef = ref(db, `imageGenerationTasks/${taskId}`);
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+  const taskRef = ref(db, `imageGenerationTasks/${user.uid}/${taskId}`);
   
   // Return unsubscribe function
   return onValue(taskRef, (snapshot) => {
