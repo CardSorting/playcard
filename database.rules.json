@@ -9,7 +9,7 @@
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
           },
           "status": {
-            ".validate": "newData.isString() && ['pending', 'processing', 'completed', 'failed'].includes(newData.val())"
+            ".validate": "newData.isString() && (newData.val() == 'pending' || newData.val() == 'processing' || newData.val() == 'completed' || newData.val() == 'failed')"
           },
           "progress": {
             ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100"
