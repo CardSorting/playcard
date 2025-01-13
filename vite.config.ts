@@ -18,6 +18,7 @@ export default defineConfig({
   },
   optimizeDeps: {
     entries: ["src/main.tsx", "src/tempobook/**/*"],
+    include: ["@mui/material", "@mui/icons-material"],
   },
   plugins: [
     react({

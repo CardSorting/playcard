@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ExamplePrompts from "./ExamplePrompts";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,7 +53,7 @@ export default function ImageGenerator() {
     if (!user) return;
 
     try {
-      const generationsRef = collection(db, "generatedImages");
+      const generationsRef = collection(db, "cardGeneration");
       const q = query(
         generationsRef,
         where("userId", "==", user.uid),
@@ -81,7 +82,7 @@ export default function ImageGenerator() {
     if (!user) return;
 
     try {
-      const generationsRef = collection(db, "generatedImages");
+      const generationsRef = collection(db, "cardGeneration");
       await addDoc(generationsRef, {
         userId: user.uid,
         prompt,
@@ -179,6 +180,7 @@ export default function ImageGenerator() {
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Input Section */}
+          <ExamplePrompts onSelectExample={(prompt) => setPrompt(prompt)} />
           <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800">
             <div className="space-y-6">
               <div className="space-y-2">
