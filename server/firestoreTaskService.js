@@ -11,6 +11,8 @@ class FirestoreTaskService {
       const taskId = randomUUID();
       const now = Timestamp.now();
       
+      console.log('Creating task:', { taskId, prompt, aspectRatio });
+
       const taskData = {
         prompt,
         aspectRatio,
@@ -38,6 +40,7 @@ class FirestoreTaskService {
       
       await batch.commit();
 
+      console.log('Task created successfully:', taskId);
       return taskId;
     } catch (error) {
       console.error('Error creating task:', error);
@@ -47,6 +50,8 @@ class FirestoreTaskService {
 
   async getTaskStatus(taskId) {
     try {
+      console.log('Fetching task status:', taskId);
+      
       const taskRef = db.collection(TASK_COLLECTION).doc(taskId);
       const statusRef = db.collection(TASK_STATUS_COLLECTION).doc(taskId);
       
@@ -56,11 +61,15 @@ class FirestoreTaskService {
       ]);
 
       if (!taskDoc.exists || !statusDoc.exists) {
+        console.log('Task not found:', taskId);
         return null;
       }
 
       const taskData = taskDoc.data();
       const statusData = statusDoc.data();
+
+      console.log('Task data:', taskData);
+      console.log('Status data:', statusData);
 
       // Convert Firestore Timestamps to JavaScript Dates
       const convertedTaskData = {
