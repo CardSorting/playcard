@@ -16,9 +16,6 @@ async function getCurrentUser(): Promise<User> {
   return user;
 }
 
-// In-memory task status cache
-const taskStatusCache = new Map<string, any>();
-
 export const generateImageTask = async (prompt: string, aspectRatio: string) => {
   const user = await getCurrentUser();
   const taskId = uuidv4();
@@ -36,7 +33,6 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
   };
 
   await set(taskRef, taskData);
-  taskStatusCache.set(taskId, taskData);
 
   try {
     const headers = new Headers({
@@ -71,7 +67,6 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
       updatedAt: Date.now()
     };
     await set(taskRef, processingData);
-    taskStatusCache.set(taskId, processingData);
 
     // Make API request
     const response = await fetch(API_URL, {
@@ -96,7 +91,6 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
     };
     
     await set(taskRef, completedData);
-    taskStatusCache.set(taskId, completedData);
 
     return {
       task_id: taskId,
@@ -114,14 +108,26 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
     };
     
     await set(taskRef, errorData);
-    taskStatusCache.set(taskId, errorData);
 
     throw error;
   }
 };
 
-export const getTaskStatus = (taskId: string) => {
-  return taskStatusCache.get(taskId) || null;
+export const getTaskStatus = async (taskId: string) => {
+  const user = await getCurrentUser();
+  const taskRef = ref(db, `imageGenerationTasks/${user.uid}/${taskId}`);
+  
+  return new Promise((resolve, reject) => {
+    onValue(taskRef, (snapshot) => {
+      if (snapshot.exists()) {
+        resolve(snapshot.val());
+      } else {
+        resolve(null);
+      }
+    }, {
+      onlyOnce: true
+    });
+  });
 };
 
 export const subscribeToTaskUpdates = (taskId: string, callback: (task: any) => void) => {
@@ -134,9 +140,7 @@ export const subscribeToTaskUpdates = (taskId: string, callback: (task: any) => 
   // Return unsubscribe function
   return onValue(taskRef, (snapshot) => {
     if (snapshot.exists()) {
-      const taskData = snapshot.val();
-      taskStatusCache.set(taskId, taskData);
-      callback(taskData);
+      callback(snapshot.val());
     }
   });
 };

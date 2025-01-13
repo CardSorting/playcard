@@ -5,6 +5,10 @@
         ".read": "auth != null && auth.uid == $uid",
         ".write": "auth != null && auth.uid == $uid",
         "$taskId": {
+          ".validate": "newData.hasChildren(['id', 'prompt', 'status', 'progress', 'createdAt', 'updatedAt'])",
+          "id": {
+            ".validate": "newData.isString() && newData.val() == $taskId"
+          },
           "prompt": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 500"
           },
@@ -19,6 +23,15 @@
           },
           "updatedAt": {
             ".validate": "newData.isNumber() && newData.val() <= now"
+          },
+          "aspectRatio": {
+            ".validate": "newData.isString()"
+          },
+          "imageUrl": {
+            ".validate": "newData.isString() || newData.val() == null"
+          },
+          "error": {
+            ".validate": "newData.isString() || newData.val() == null"
           }
         }
       }
