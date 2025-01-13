@@ -16,35 +16,51 @@ class RedisClient {
     });
   }
 
+  decodeKey(key) {
+    try {
+      return decodeURIComponent(key);
+    } catch (error) {
+      console.error('Error decoding Redis key:', key, error);
+      return key;
+    }
+  }
+
   async hset(key, fieldValues) {
-    return this.client.hset(key, fieldValues);
+    const decodedKey = this.decodeKey(key);
+    return this.client.hset(decodedKey, fieldValues);
   }
 
   async hgetall(key) {
-    return this.client.hgetall(key);
+    const decodedKey = this.decodeKey(key);
+    return this.client.hgetall(decodedKey);
   }
 
   async get(key) {
-    return this.client.get(key);
+    const decodedKey = this.decodeKey(key);
+    return this.client.get(decodedKey);
   }
 
   async set(key, value, ttl) {
+    const decodedKey = this.decodeKey(key);
     if (ttl) {
-      return this.client.set(key, value, 'EX', ttl);
+      return this.client.set(decodedKey, value, 'EX', ttl);
     }
-    return this.client.set(key, value);
+    return this.client.set(decodedKey, value);
   }
 
   async del(key) {
-    return this.client.del(key);
+    const decodedKey = this.decodeKey(key);
+    return this.client.del(decodedKey);
   }
 
   async zadd(queue, priority, taskId) {
-    return this.client.zadd(queue, priority, taskId);
+    const decodedQueue = this.decodeKey(queue);
+    return this.client.zadd(decodedQueue, priority, taskId);
   }
 
   async keys(pattern) {
-    return this.client.keys(pattern);
+    const decodedPattern = this.decodeKey(pattern);
+    return this.client.keys(decodedPattern);
   }
 }
 
