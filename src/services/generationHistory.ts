@@ -1,11 +1,18 @@
 import { collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+export interface ImageUrls {
+  main: string;
+  variants: string[];
+  temporary: string[];
+  discord: string;
+}
+
 export interface StoredGeneration {
   id: string;
   userId: string;
   prompt: string;
-  imageUrl: string;
+  imageUrls: ImageUrls;
   aspectRatio: string;
   createdAt: Date;
 }
@@ -41,7 +48,7 @@ const memoryStorage = {
 export const storeGeneration = async (
   prompt: string,
   aspectRatio: string,
-  imageUrl: string,
+  imageUrls: ImageUrls,
   userId: string
 ): Promise<void> => {
   try {
@@ -49,7 +56,7 @@ export const storeGeneration = async (
     const generationData = {
       userId,
       prompt,
-      imageUrl,
+      imageUrls,
       aspectRatio,
       createdAt: new Date()
     };
