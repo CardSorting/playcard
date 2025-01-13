@@ -9,12 +9,14 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   token: string | null;
+  initialized: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({ 
   user: null, 
   loading: true,
-  token: null
+  token: null,
+  initialized: false
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -23,6 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
 
   const navigate = useNavigate();
 
@@ -66,46 +69,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    // Handle redirect result
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
-          await initializeUserData(result.user);
-          const token = await result.user.getIdToken();
-          setToken(token);
-          setUser(result.user);
-          navigate('/');
-        }
-        setLoading(false);
-      })
-      .catch((error) => {
-        console.error('Error handling redirect result:', error);
-        setLoading(false);
-      });
+    let isMounted = true;
 
-    // Set up auth state listener
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const handleAuthState = async (user: User | null) => {
+      if (!isMounted) return;
+
       if (user) {
         await initializeUserData(user);
         try {
           const token = await user.getIdToken();
           setToken(token);
+          sessionStorage.setItem('firebaseToken', token);
         } catch (error) {
           console.error('Error getting token:', error);
           setToken(null);
+          sessionStorage.removeItem('firebaseToken');
         }
       } else {
         setToken(null);
+        sessionStorage.removeItem('firebaseToken');
       }
+      
       setUser(user);
-      setLoading(false);
+      if (!initialized) {
+        setInitialized(true);
+        setLoading(false);
+      }
+    };
+
+    // Handle redirect result
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (result?.user) {
+          await handleAuthState(result.user);
+          navigate('/');
+        }
+      })
+      .catch((error) => {
+        console.error('Error handling redirect result:', error);
+      });
+
+    // Set up auth state listener
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      await handleAuthState(user);
     });
 
-    return unsubscribe;
-  }, [navigate]);
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, [navigate, initialized]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, token }}>
+    <AuthContext.Provider value={{ user, loading, token, initialized }}>
       {children}
     </AuthContext.Provider>
   );
