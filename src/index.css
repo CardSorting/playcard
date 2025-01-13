@@ -72,6 +72,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
@@ -88,4 +89,23 @@
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out forwards;
+}
+
+/* Route transition animations */
+.route-transition {
+  position: relative;
+}
+
+.route-transition > * {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.route-transition > .active {
+  position: static;
+  opacity: 1;
 }

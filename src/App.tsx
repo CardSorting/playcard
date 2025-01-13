@@ -87,59 +87,61 @@ const FirebaseInitializer = ({ children }: { children: React.ReactNode }) => {
 function App() {
   return (
     <AuthProvider>
-      <Nav />
-      <Routes>
-          <Route path="/login" element={
-            <PublicRoute>
-              <Login />
-            </PublicRoute>
-          } />
-          <Route path="/" element={<Home />} />
-          <Route path="/pricing" element={<Pricing />} />
-          <Route path="/booster-packs" element={
-            <FirebaseInitializer>
-              <ProtectedRoute>
-                <BoosterPacks />
-              </ProtectedRoute>
-            </FirebaseInitializer>
-          } />
-          <Route path="/collection" element={
-            <FirebaseInitializer>
-              <ProtectedRoute>
-                <Collection />
-              </ProtectedRoute>
-            </FirebaseInitializer>
-          } />
-          <Route path="/image-generator" element={
-            <FirebaseInitializer>
-              <ProtectedRoute>
-                <ImageGenerator />
-              </ProtectedRoute>
-            </FirebaseInitializer>
-          } />
-          <Route path="/marketplace/*" element={
-            <FirebaseInitializer>
-              <ProtectedRoute>
-                <Marketplace />
-              </ProtectedRoute>
-            </FirebaseInitializer>
-          } />
-          <Route path="/claims" element={
-            <FirebaseInitializer>
-              <ProtectedRoute>
-                <Claims />
-              </ProtectedRoute>
-            </FirebaseInitializer>
-          } />
-          <Route path="/card-creator" element={
-            <FirebaseInitializer>
-              <ProtectedRoute>
-                <CardCreator />
-              </ProtectedRoute>
-            </FirebaseInitializer>
-          } />
-      </Routes>
-      <Toaster />
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 transition-colors duration-300">
+        <Nav />
+        <Routes>
+            <Route path="/login" element={
+              <PublicRoute>
+                <Login />
+              </PublicRoute>
+            } />
+            <Route path="/" element={<Home />} />
+            <Route path="/pricing" element={<Pricing />} />
+            <Route path="/booster-packs" element={
+              <FirebaseInitializer>
+                <ProtectedRoute>
+                  <BoosterPacks />
+                </ProtectedRoute>
+              </FirebaseInitializer>
+            } />
+            <Route path="/collection" element={
+              <FirebaseInitializer>
+                <ProtectedRoute>
+                  <Collection />
+                </ProtectedRoute>
+              </FirebaseInitializer>
+            } />
+            <Route path="/image-generator" element={
+              <FirebaseInitializer>
+                <ProtectedRoute>
+                  <ImageGenerator />
+                </ProtectedRoute>
+              </FirebaseInitializer>
+            } />
+            <Route path="/marketplace/*" element={
+              <FirebaseInitializer>
+                <ProtectedRoute>
+                  <Marketplace />
+                </ProtectedRoute>
+              </FirebaseInitializer>
+            } />
+            <Route path="/claims" element={
+              <FirebaseInitializer>
+                <ProtectedRoute>
+                  <Claims />
+                </ProtectedRoute>
+              </FirebaseInitializer>
+            } />
+            <Route path="/card-creator" element={
+              <FirebaseInitializer>
+                <ProtectedRoute>
+                  <CardCreator />
+                </ProtectedRoute>
+              </FirebaseInitializer>
+            } />
+        </Routes>
+        <Toaster />
+      </div>
     </AuthProvider>
   );
 }
