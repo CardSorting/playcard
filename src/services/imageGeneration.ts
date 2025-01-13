@@ -42,84 +42,14 @@ export const generateImageTask = async (prompt: string, aspectRatio: string): Pr
 
   // Add task to queue
   await redisApi.enqueue(TASK_QUEUE_NAME, task);
-  
-  // Process task immediately
-  const myHeaders = new Headers();
-  myHeaders.append("x-api-key", import.meta.env.VITE_GOAPI_KEY || "");
-  myHeaders.append("Content-Type", "application/json");
-
-  const response = await fetch("https://api.goapi.ai/api/v1/task", {
-    method: "POST",
-    headers: myHeaders,
-    body: JSON.stringify({
-      model: "midjourney",
-      task_type: "imagine",
-      input: {
-        prompt,
-        aspect_ratio: aspectRatio,
-        process_mode: "fast",
-        skip_prompt_check: false,
-        bot_id: 0,
-      },
-      config: {
-        service_mode: "",
-        webhook_config: {
-          endpoint: "",
-          secret: "",
-        },
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create task: ${response.statusText}`);
-  }
-
-  const responseData = await response.json();
-  if (responseData.code !== 200) {
-    throw new Error(responseData.data.error?.message || "Failed to create task");
-  }
 
   // Cache the task ID
+  const taskId =  `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
   await redisApi.set(
     `${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`,
-    { task_id: responseData.data.task_id },
+    { task_id: taskId },
     TASK_CACHE_TTL
   );
 
-  return responseData.data.task_id;
-};
-
-export const pollTaskStatus = async (taskId: string): Promise<TaskResponse> => {
-  // Check cache first
-  const cachedStatus = await redisApi.get(`task_status:${taskId}`);
-  if (cachedStatus) {
-    return cachedStatus;
-  }
-
-  const myHeaders = new Headers();
-  myHeaders.append("x-api-key", import.meta.env.VITE_GOAPI_KEY || "");
-
-  const response = await fetch(`https://api.goapi.ai/api/v1/task/${taskId}`, {
-    method: "GET",
-    headers: myHeaders,
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch task status: ${response.statusText}`);
-  }
-
-  const responseData = await response.json();
-  if (responseData.code !== 200) {
-    throw new Error(responseData.data.error?.message || "Failed to fetch task status");
-  }
-
-  // Cache the status
-  await redisApi.set(
-    `task_status:${taskId}`,
-    responseData,
-    TASK_CACHE_TTL
-  );
-
-  return responseData;
+  return taskId;
 };

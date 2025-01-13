@@ -85,6 +85,75 @@ app.get('/redis/dequeue/:queueName', async (req, res) => {
   }
 });
 
+// Task processing endpoint
+app.post('/process-task', async (req, res) => {
+  try {
+    const task = await redis.lpop('image_generation_tasks');
+    if (!task) {
+      return res.status(200).json({ message: 'No tasks in queue' });
+    }
+
+    const parsedTask = JSON.parse(task);
+    const { prompt, aspectRatio } = parsedTask;
+
+    const myHeaders = new Headers();
+    myHeaders.append("x-api-key", process.env.VITE_GOAPI_KEY || "");
+    myHeaders.append("Content-Type", "application/json");
+
+    const response = await fetch("https://api.goapi.ai/api/v1/task", {
+      method: "POST",
+      headers: myHeaders,
+      body: JSON.stringify({
+        model: "midjourney",
+        task_type: "imagine",
+        input: {
+          prompt,
+          aspect_ratio: aspectRatio,
+          process_mode: "fast",
+          skip_prompt_check: false,
+          bot_id: 0,
+        },
+        config: {
+          service_mode: "",
+          webhook_config: {
+            endpoint: "",
+            secret: "",
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to create task: ${response.statusText}`);
+    }
+
+    const responseData = await response.json();
+    if (responseData.code !== 200) {
+      throw new Error(responseData.data.error?.message || "Failed to create task");
+    }
+
+    // Cache the task ID
+    await redis.set(
+      `task_status:${responseData.data.task_id}`,
+      {
+        code: responseData.code,
+        data: {
+          status: responseData.data.status,
+          output: responseData.data.output,
+          error: responseData.data.error,
+        },
+        message: responseData.message,
+      },
+      60 * 60
+    );
+
+    res.status(200).json({ message: 'Task processed successfully', taskId: responseData.data.task_id });
+  } catch (error) {
+    console.error('Error processing task:', error);
+    res.status(500).json({ error: 'Failed to process task' });
+  }
+});
+
 // Start server
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);

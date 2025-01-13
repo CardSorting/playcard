@@ -1,12 +1,14 @@
 import { useState, useRef } from "react";
 import { useToast } from "@/components/ui/use-toast";
-import { generateImageTask, pollTaskStatus } from "@/services/imageGeneration";
+import { generateImageTask } from "@/services/imageGeneration";
 import { storeGeneration } from "@/services/generationHistory";
 import { useAuth } from "@/lib/contexts/auth-context";
 
 const INITIAL_POLL_INTERVAL = 5000; // 5 seconds
 const MAX_POLL_INTERVAL = 30000; // 30 seconds
 const MAX_RETRIES = 5;
+const API_BASE_URL = 'http://localhost:3001';
+
 
 interface GenerationResult {
   taskId: string;
@@ -87,11 +89,23 @@ export default function useImageGeneration() {
     }
 
     try {
-      const response = await pollTaskStatus(taskId);
-      const mappedStatus = mapApiStatus(response.data.status);
+      const response = await fetch(`${API_BASE_URL}/redis/get/task_status:${taskId}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch task status: ${response.statusText}`);
+      }
+      const responseData = await response.json();
+      if (!responseData?.value) {
+          throw new Error("Invalid response from task status API");
+      }
+      const taskStatus = responseData.value;
+      const mappedStatus = mapApiStatus(taskStatus.data.status);
       
       if (mappedStatus === "completed") {
-        const imageUrls = response.data.output.image_urls;
+        if (!taskStatus.data.output?.image_urls) {
+          throw new Error("Completed task missing image URLs");
+        }
+        
+        const imageUrls = taskStatus.data.output.image_urls;
         setResult({
           taskId,
           status: "completed",
@@ -110,21 +124,34 @@ export default function useImageGeneration() {
         setResult({
           taskId,
           status: "pending",
-          progress: response.data.output?.progress || 0
+          progress: taskStatus.data.output?.progress || 0
         });
         scheduleNextPoll(taskId, prompt, aspectRatio, interval);
       } else {
-        throw new Error(response.data.error?.message || "Task failed");
+        throw new Error(
+          taskStatus.data.error?.message || 
+          `Task failed with status: ${taskStatus.data.status}`
+        );
       }
     } catch (error) {
-      if (error.response?.status === 400) {
+      console.error("Error polling task status:", {
+        taskId,
+        error: error.message,
+        stack: error.stack,
+        response: {
+          status: error.response?.status,
+          data: error.response?.data
+        }
+      });
+
+      if (error.message === "Invalid response from task status API" || error.response?.status === 400 || error.response?.status === 404) {
         retryCountRef.current++;
         if (retryCountRef.current >= MAX_RETRIES) {
           console.error("Max retries reached for task:", taskId);
           setResult({ taskId, status: "error" });
           toast({
             title: "Error",
-            description: "Failed to generate image - invalid task",
+            description: `Failed to generate image: ${error.message}`,
             variant: "destructive",
           });
           cleanupPolling();
@@ -136,11 +163,10 @@ export default function useImageGeneration() {
         const nextInterval = Math.min(interval * 2, MAX_POLL_INTERVAL);
         scheduleNextPoll(taskId, prompt, aspectRatio, nextInterval);
       } else {
-        console.error("Error polling task status:", error);
         setResult({ taskId, status: "error" });
         toast({
           title: "Error",
-          description: "Failed to generate image",
+          description: `Failed to generate image: ${error.message}`,
           variant: "destructive",
         });
         cleanupPolling();
