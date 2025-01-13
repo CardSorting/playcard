@@ -18,7 +18,8 @@ router.post('/set', async (req, res) => {
 router.get('/get/:key', async (req, res) => {
   try {
     const { key } = req.params;
-    const value = await redisClient.get(key);
+    const decodedKey = decodeURIComponent(key);
+    const value = await redisClient.get(decodedKey);
     if (value === null) {
       return res.status(404).json({ error: 'Key not found' });
     }
@@ -32,7 +33,8 @@ router.get('/get/:key', async (req, res) => {
 router.delete('/del/:key', async (req, res) => {
   try {
     const { key } = req.params;
-    await redisClient.del(key);
+    const decodedKey = decodeURIComponent(key);
+    await redisClient.del(decodedKey);
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Redis del error:', error);
