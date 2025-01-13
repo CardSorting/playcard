@@ -46,7 +46,12 @@ export default function useImageGeneration() {
         });
 
         if (task.status === "completed") {
-          storeGeneration(prompt, aspectRatio, task.imageUrl, user.uid);
+          storeGeneration(prompt, aspectRatio, {
+            main: task.imageUrl || '',
+            variants: [],
+            temporary: [],
+            discord: ''
+          }, user.uid);
           toast({
             title: "Success",
             description: "Image generated successfully!",

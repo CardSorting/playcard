@@ -48,16 +48,16 @@ const memoryStorage = {
 export const storeGeneration = async (
   prompt: string,
   aspectRatio: string,
-  imageUrls: Partial<ImageUrls>,
+  imageUrls: Partial<ImageUrls> | undefined,
   userId: string
 ): Promise<void> => {
   try {
-    // Validate and sanitize imageUrls
+    // Handle undefined imageUrls
     const sanitizedImageUrls: ImageUrls = {
-      main: imageUrls.main || '',
-      variants: imageUrls.variants || [],
-      temporary: imageUrls.temporary || [],
-      discord: imageUrls.discord || ''
+      main: imageUrls?.main || '',
+      variants: imageUrls?.variants || [],
+      temporary: imageUrls?.temporary || [],
+      discord: imageUrls?.discord || ''
     };
 
     const generationsRef = collection(db, "cardGeneration");
