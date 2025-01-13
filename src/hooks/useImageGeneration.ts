@@ -17,14 +17,14 @@ export default function useImageGeneration() {
   const { toast } = useToast();
   const { user } = useAuth();
 
-  const handleGenerate = async (prompt: string, aspectRatio: string) => {
+  const handleGenerate = async (prompt: string, aspectRatio: string, processMode: 'relax' | 'fast' | 'turbo' = 'fast') => {
     if (!user) return;
 
     setIsGenerating(true);
     setResult({ taskId: "", status: "pending", progress: 0 });
 
     try {
-      const generationResult = await generateImageTask(prompt, aspectRatio);
+      const generationResult = await generateImageTask(prompt, aspectRatio, processMode);
       
       if (!generationResult?.task_id) {
         throw new Error("Failed to start image generation");

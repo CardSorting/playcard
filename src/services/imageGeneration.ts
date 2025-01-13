@@ -16,7 +16,11 @@ async function getCurrentUser(): Promise<User> {
   return user;
 }
 
-export const generateImageTask = async (prompt: string, aspectRatio: string) => {
+export const generateImageTask = async (
+  prompt: string,
+  aspectRatio: string,
+  processMode: 'relax' | 'fast' | 'turbo' = 'fast'
+) => {
   const user = await getCurrentUser();
   const taskId = uuidv4();
   const taskRef = ref(db, `imageGenerationTasks/${user.uid}/${taskId}`);
@@ -26,6 +30,7 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
     id: taskId,
     prompt,
     aspectRatio,
+    processMode,
     status: 'pending',
     progress: 0,
     createdAt: Date.now(),
@@ -46,7 +51,7 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
       input: {
         prompt,
         aspect_ratio: aspectRatio,
-        process_mode: 'fast',
+        process_mode: processMode,
         skip_prompt_check: false,
         bot_id: 0
       },
@@ -81,12 +86,17 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
 
     const result = await response.json();
 
+    // Handle API errors
+    if (result.error?.message) {
+      throw new Error(result.error.message);
+    }
+
     // Extract all image URLs from response
     const imageUrls = {
-      main: result.output?.image_url || '',
-      variants: result.output?.image_urls || [],
-      temporary: result.output?.temporary_image_urls || [],
-      discord: result.output?.discord_image_url || ''
+      main: result.data?.output?.image_url || '',
+      variants: result.data?.output?.image_urls || [],
+      temporary: result.data?.output?.temporary_image_urls || [],
+      discord: result.data?.output?.discord_image_url || ''
     };
 
     // Update with completed data
@@ -100,7 +110,6 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
     
     await set(taskRef, completedData);
 
-    // Return all relevant data including URLs
     return {
       task_id: taskId,
       status: 'completed',
