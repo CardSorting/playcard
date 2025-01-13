@@ -21,10 +21,10 @@ export default function Home() {
             <div className="space-y-8">
               <h1 className="text-5xl font-bold tracking-tight text-white sm:text-6xl">
                 Create Your Own{" "}
-                <span className="text-yellow-400">Pokemon Cards</span>
+                <span className="text-yellow-400">Trading Cards</span>
               </h1>
               <p className="text-xl text-gray-300">
-                Design and customize unique Pokemon cards with our intuitive
+                Design and customize unique Trading cards with our intuitive
                 card creator. Choose types, add images, and bring your ideas to
                 life.
               </p>
@@ -64,7 +64,7 @@ export default function Home() {
               Powerful Features
             </h2>
             <p className="mt-4 text-lg text-gray-400">
-              Everything you need to create amazing Pokemon cards
+              Everything you need to create amazing Trading cards
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -91,10 +91,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="bg-black/5 p-8 rounded-3xl">
             <h2 className="text-5xl font-bold text-black mb-6">
-              Create Your Dream Pokémon Cards Today!
+              Create Your Dream Trading Cards Today!
             </h2>
             <p className="text-xl text-gray-800 mb-8 max-w-2xl mx-auto">
-              Join over <span className="font-semibold">15,000+</span> Pokémon fans who've created <span className="font-semibold">100,000+</span> unique cards
+              Join over <span className="font-semibold">15,000+</span> Trading Card fans who've created <span className="font-semibold">100,000+</span> unique cards
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -145,7 +145,7 @@ export default function Home() {
       <footer className="bg-gray-900 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center text-gray-400">
-            <p>© 2024 Pokemon Card Creator. All rights reserved.</p>
+            <p>© 2024 PlayMore TCG. All rights reserved.</p>
           </div>
         </div>
       </footer>

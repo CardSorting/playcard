@@ -18,7 +18,7 @@ export default function Nav() {
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">
             <Link to="/" className="text-white font-bold">
-              PlayCard
+              PlayMoreTCG
             </Link>
             <div className="flex items-center gap-6">
               <Link to="/" className={linkClass}>
