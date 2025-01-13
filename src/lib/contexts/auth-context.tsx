@@ -71,20 +71,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let isMounted = true;
 
-    console.log('Setting up auth state listener...');
-    console.log('Current auth state:', auth.currentUser);
-
     const handleAuthState = async (user: User | null) => {
       if (!isMounted) return;
-
-      console.log('Auth state changed:', user);
       
       if (user) {
-        console.log('User authenticated:', user.uid);
         await initializeUserData(user);
         try {
           const token = await user.getIdToken();
-          console.log('Token received:', token);
           setToken(token);
           sessionStorage.setItem('firebaseToken', token);
         } catch (error) {
@@ -93,7 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           sessionStorage.removeItem('firebaseToken');
         }
       } else {
-        console.log('No authenticated user');
         setToken(null);
         sessionStorage.removeItem('firebaseToken');
       }
@@ -109,7 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     getRedirectResult(auth)
       .then(async (result) => {
         if (result?.user) {
-          console.log('Redirect result received:', result.user.uid);
           await handleAuthState(result.user);
           navigate('/');
         }
@@ -120,12 +111,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set up auth state listener
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      console.log('Auth state changed:', user?.uid);
       await handleAuthState(user);
     });
 
     return () => {
-      console.log('Cleaning up auth state listener');
       isMounted = false;
       unsubscribe();
     };
