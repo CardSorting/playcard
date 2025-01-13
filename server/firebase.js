@@ -1,20 +1,27 @@
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import credentials from '../cred/playerstcg-bbc59-firebase-adminsdk-lzbr1-9b769a383a.json' assert { type: 'json' };
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-const firebaseConfig = {
-  apiKey: credentials.apiKey,
-  authDomain: credentials.authDomain,
-  projectId: credentials.projectId,
-  storageBucket: credentials.storageBucket,
-  messagingSenderId: credentials.messagingSenderId,
-  appId: credentials.appId
-};
+// Get current directory path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Read service account credentials
+const serviceAccount = JSON.parse(
+  readFileSync(
+    join(__dirname, '../cred/playerstcg-bbc59-firebase-adminsdk-lzbr1-9b769a383a.json'),
+    'utf-8'
+  )
+);
+
+// Initialize Firebase Admin SDK
+const app = initializeApp({
+  credential: cert(serviceAccount)
+});
+
+// Get Firestore instance
 const db = getFirestore(app);
-const auth = getAuth(app);
 
-export { db, auth };
+export { db };

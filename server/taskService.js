@@ -21,7 +21,7 @@ class TaskService {
       prompt,
       aspectRatio,
       status: 'pending',
-      createdAt: Date.now()
+      createdAt: new Date()
     };
     this.tasks.set(taskId, task);
     this.taskStatuses.set(taskId, 'pending');
@@ -46,7 +46,7 @@ class TaskService {
     if (task) {
       task.status = 'completed';
       task.result = result;
-      task.completedAt = Date.now();
+      task.completedAt = new Date();
       this.taskStatuses.set(taskId, 'completed');
     }
   }

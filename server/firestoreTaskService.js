@@ -1,16 +1,5 @@
 import { db } from './firebase.js';
-import { 
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  updateDoc,
-  deleteDoc,
-  query,
-  where,
-  getDocs,
-  Timestamp
-} from 'firebase/firestore';
+import { Timestamp } from 'firebase-admin/firestore';
 
 const TASK_COLLECTION = 'tasks';
 const TASK_STATUS_COLLECTION = 'taskStatuses';
@@ -38,8 +27,15 @@ class FirestoreTaskService {
       };
 
       // Use batch write for atomic operation
-      await setDoc(doc(db, TASK_COLLECTION, taskId), taskData);
-      await setDoc(doc(db, TASK_STATUS_COLLECTION, taskId), statusData);
+      const batch = db.batch();
+      
+      const taskRef = db.collection(TASK_COLLECTION).doc(taskId);
+      const statusRef = db.collection(TASK_STATUS_COLLECTION).doc(taskId);
+      
+      batch.set(taskRef, taskData);
+      batch.set(statusRef, statusData);
+      
+      await batch.commit();
 
       return taskId;
     } catch (error) {
@@ -50,21 +46,33 @@ class FirestoreTaskService {
 
   async getTaskStatus(taskId) {
     try {
-      const taskRef = doc(db, TASK_COLLECTION, taskId);
-      const statusRef = doc(db, TASK_STATUS_COLLECTION, taskId);
+      const taskRef = db.collection(TASK_COLLECTION).doc(taskId);
+      const statusRef = db.collection(TASK_STATUS_COLLECTION).doc(taskId);
       
       const [taskDoc, statusDoc] = await Promise.all([
-        getDoc(taskRef),
-        getDoc(statusRef)
+        taskRef.get(),
+        statusRef.get()
       ]);
 
-      if (!taskDoc.exists() || !statusDoc.exists()) {
+      if (!taskDoc.exists || !statusDoc.exists) {
         return null;
       }
 
+      const taskData = taskDoc.data();
+      const statusData = statusDoc.data();
+
+      // Convert Firestore Timestamps to JavaScript Dates
+      const convertedTaskData = {
+        ...taskData,
+        createdAt: taskData.createdAt.toDate(),
+        startedAt: taskData.startedAt.toDate(),
+        updatedAt: taskData.updatedAt.toDate(),
+        completedAt: taskData.completedAt ? taskData.completedAt.toDate() : null
+      };
+
       return {
-        ...taskDoc.data(),
-        currentStatus: statusDoc.data().status
+        ...convertedTaskData,
+        currentStatus: statusData.status
       };
     } catch (error) {
       console.error('Error getting task status:', error);
@@ -75,21 +83,24 @@ class FirestoreTaskService {
   async completeTask(taskId, result) {
     try {
       const now = Timestamp.now();
-      const taskRef = doc(db, TASK_COLLECTION, taskId);
-      const statusRef = doc(db, TASK_STATUS_COLLECTION, taskId);
+      const taskRef = db.collection(TASK_COLLECTION).doc(taskId);
+      const statusRef = db.collection(TASK_STATUS_COLLECTION).doc(taskId);
       
-      await Promise.all([
-        updateDoc(taskRef, {
-          status: 'completed',
-          result: JSON.stringify(result),
-          completedAt: now,
-          progress: 100
-        }),
-        updateDoc(statusRef, {
-          status: 'completed',
-          updatedAt: now
-        })
-      ]);
+      const batch = db.batch();
+      
+      batch.update(taskRef, {
+        status: 'completed',
+        result: JSON.stringify(result),
+        completedAt: now,
+        progress: 100
+      });
+      
+      batch.update(statusRef, {
+        status: 'completed',
+        updatedAt: now
+      });
+      
+      await batch.commit();
     } catch (error) {
       console.error('Error completing task:', error);
       throw new Error('Failed to complete task');
@@ -99,22 +110,18 @@ class FirestoreTaskService {
   async cleanupOldTasks() {
     try {
       const cutoff = Timestamp.fromMillis(Date.now() - (24 * 60 * 60 * 1000));
-      const q = query(
-        collection(db, TASK_COLLECTION),
-        where('completedAt', '<', cutoff)
-      );
+      const snapshot = await db.collection(TASK_COLLECTION)
+        .where('completedAt', '<', cutoff)
+        .get();
 
-      const snapshot = await getDocs(q);
-      const deletePromises = [];
+      const batch = db.batch();
       
-      snapshot.forEach((doc) => {
-        deletePromises.push(
-          deleteDoc(doc.ref),
-          deleteDoc(doc(db, TASK_STATUS_COLLECTION, doc.id))
-        );
+      snapshot.forEach(doc => {
+        batch.delete(doc.ref);
+        batch.delete(db.collection(TASK_STATUS_COLLECTION).doc(doc.id));
       });
 
-      await Promise.all(deletePromises);
+      await batch.commit();
     } catch (error) {
       console.error('Error cleaning up old tasks:', error);
       throw new Error('Failed to clean up old tasks');

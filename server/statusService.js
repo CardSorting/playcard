@@ -11,6 +11,12 @@ class StatusService {
     }
   }
 
+  convertToISOString(timestamp) {
+    if (!timestamp) return null;
+    // Handle both Date objects and Firestore Timestamps
+    return timestamp.toDate ? timestamp.toDate().toISOString() : timestamp.toISOString();
+  }
+
   formatTaskResponse(task) {
     if (!task) return null;
 
@@ -47,9 +53,9 @@ class StatusService {
         intermediate_image_urls: null
       },
       meta: {
-        created_at: task.createdAt?.toISOString() || now,
-        started_at: task.startedAt?.toISOString() || now,
-        ended_at: task.completedAt?.toISOString() || now,
+        created_at: this.convertToISOString(task.createdAt) || now,
+        started_at: this.convertToISOString(task.startedAt) || now,
+        ended_at: this.convertToISOString(task.completedAt) || now,
         usage: {
           type: "mj",
           frozen: 0,
