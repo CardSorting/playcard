@@ -28,7 +28,10 @@ export const realtimeDb = getDatabase(app);
 // Configure auth persistence and wait for initialization
 export const initializeFirebase = async () => {
   try {
-    await setPersistence(auth, browserSessionPersistence);
+    // Use in-memory persistence to avoid window operations
+    await setPersistence(auth, {
+      type: 'NONE'
+    });
     console.log('Firebase initialized successfully');
     return true;
   } catch (error) {
