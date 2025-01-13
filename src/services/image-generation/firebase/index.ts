@@ -1,9 +1,9 @@
-import { getDatabase, ref, set, onValue } from 'firebase/database';
-import { app } from '@/lib/firebase';
+import { ref, set, onValue } from 'firebase/database';
+import { realtimeDb } from '@/lib/firebase';
 import { Task, TaskUpdateParams } from '../types';
 
 export class FirebaseImageService {
-  private db = getDatabase(app);
+  private db = realtimeDb;
 
   async createTask(userId: string, taskData: Task) {
     const taskRef = ref(this.db, `imageGenerationTasks/${userId}/${taskData.id}`);
