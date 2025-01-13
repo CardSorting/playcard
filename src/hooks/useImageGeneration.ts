@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/contexts/auth-context";
 interface GenerationResult {
   taskId: string;
   imageUrl?: string;
-  status: "pending" | "completed" | "error";
+  status: "pending" | "processing" | "completed" | "failed";
   progress?: number;
 }
 
@@ -24,7 +24,11 @@ export default function useImageGeneration() {
     setResult({ taskId: "", status: "pending", progress: 0 });
 
     try {
-      const generationResult = await generateImageTask(prompt, aspectRatio, processMode);
+      const generationResult = await generateImageTask({
+        prompt,
+        aspectRatio,
+        processMode
+      });
       
       if (!generationResult?.task_id) {
         throw new Error("Failed to start image generation");
@@ -37,41 +41,45 @@ export default function useImageGeneration() {
       });
 
       // Subscribe to task updates
-      const unsubscribe = subscribeToTaskUpdates(generationResult.task_id, (task) => {
-        setResult({
-          taskId: task.id,
-          status: task.status,
-          progress: task.progress,
-          imageUrl: task.imageUrl
-        });
+      const unsubscribe = subscribeToTaskUpdates(
+        generationResult.task_id,
+        user.uid,
+        (task) => {
+          setResult({
+            taskId: task.id,
+            status: task.status,
+            progress: task.progress,
+            imageUrl: task.imageUrls?.main
+          });
 
-        if (task.status === "completed") {
-          storeGeneration(prompt, aspectRatio, {
-            main: task.imageUrl || '',
-            variants: [],
-            temporary: [],
-            discord: ''
-          }, user.uid);
-          toast({
-            title: "Success",
-            description: "Image generated successfully!",
-          });
-          setIsGenerating(false);
-          unsubscribe();
-        } else if (task.status === "error") {
-          toast({
-            title: "Error",
-            description: "Failed to generate image",
-            variant: "destructive",
-          });
-          setIsGenerating(false);
-          unsubscribe();
+          if (task.status === "completed") {
+            storeGeneration(prompt, aspectRatio, {
+              main: task.imageUrls?.main || '',
+              variants: task.imageUrls?.variants || [],
+              temporary: task.imageUrls?.temporary || [],
+              discord: task.imageUrls?.discord || ''
+            }, user.uid);
+            toast({
+              title: "Success",
+              description: "Image generated successfully!",
+            });
+            setIsGenerating(false);
+            unsubscribe();
+          } else if (task.status === "failed") {
+            toast({
+              title: "Error",
+              description: "Failed to generate image",
+              variant: "destructive",
+            });
+            setIsGenerating(false);
+            unsubscribe();
+          }
         }
-      });
+      );
 
     } catch (error) {
       console.error("Error generating image:", error);
-      setResult({ taskId: "", status: "error" });
+      setResult({ taskId: "", status: "failed" });
       toast({
         title: "Error",
         description: "Failed to start image generation",
