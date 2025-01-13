@@ -9,7 +9,6 @@ const MAX_POLL_INTERVAL = 30000; // 30 seconds
 const MAX_RETRIES = 5;
 const API_BASE_URL = 'http://localhost:3001';
 
-
 interface GenerationResult {
   taskId: string;
   imageUrl?: string;
@@ -89,23 +88,24 @@ export default function useImageGeneration() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/redis/get/task_status:${taskId}`);
+      const response = await fetch(`${API_BASE_URL}/task-status/${taskId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch task status: ${response.statusText}`);
       }
       const responseData = await response.json();
-      if (!responseData?.value) {
+      if (!responseData?.currentStatus) {
           throw new Error("Invalid response from task status API");
       }
-      const taskStatus = responseData.value;
-      const mappedStatus = mapApiStatus(taskStatus.data.status);
+      const taskStatus = responseData;
+      const mappedStatus = mapApiStatus(taskStatus.currentStatus);
       
       if (mappedStatus === "completed") {
-        if (!taskStatus.data.output?.image_urls) {
+        if (!taskStatus.result) {
           throw new Error("Completed task missing image URLs");
         }
         
-        const imageUrls = taskStatus.data.output.image_urls;
+        const resultData = JSON.parse(taskStatus.result);
+        const imageUrls = resultData.data.output?.image_urls || [];
         setResult({
           taskId,
           status: "completed",
@@ -124,13 +124,13 @@ export default function useImageGeneration() {
         setResult({
           taskId,
           status: "pending",
-          progress: taskStatus.data.output?.progress || 0
+          progress: taskStatus.progress || 0
         });
         scheduleNextPoll(taskId, prompt, aspectRatio, interval);
       } else {
         throw new Error(
-          taskStatus.data.error?.message || 
-          `Task failed with status: ${taskStatus.data.status}`
+          taskStatus.error || 
+          `Task failed with status: ${taskStatus.currentStatus}`
         );
       }
     } catch (error) {
