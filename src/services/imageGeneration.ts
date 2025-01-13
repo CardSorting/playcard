@@ -1,6 +1,9 @@
 import { db } from '@/lib/firebase';
-import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+
+const API_URL = 'https://api.goapi.ai/api/v1/task';
+const API_KEY = import.meta.env.VITE_GOAPI_KEY;
 
 // In-memory task status cache
 const taskStatusCache = new Map<string, any>();
@@ -21,41 +24,88 @@ export const generateImageTask = async (prompt: string, aspectRatio: string) => 
   };
 
   await setDoc(taskRef, taskData);
-  
-  // Store in memory cache
   taskStatusCache.set(taskId, taskData);
 
-  // Simulate image generation process
-  setTimeout(async () => {
-    const updatedData = {
+  try {
+    const headers = new Headers({
+      'x-api-key': API_KEY,
+      'Content-Type': 'application/json'
+    });
+
+    const requestBody = {
+      model: 'midjourney',
+      task_type: 'imagine',
+      input: {
+        prompt,
+        aspect_ratio: aspectRatio,
+        process_mode: 'fast',
+        skip_prompt_check: false,
+        bot_id: 0
+      },
+      config: {
+        service_mode: '',
+        webhook_config: {
+          endpoint: '',
+          secret: ''
+        }
+      }
+    };
+
+    // Update status to processing
+    const processingData = {
       ...taskData,
       status: 'processing',
       progress: 50,
       updatedAt: new Date().toISOString()
     };
+    await setDoc(taskRef, processingData);
+    taskStatusCache.set(taskId, processingData);
+
+    // Make API request
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    // Update with completed data
+    const completedData = {
+      ...processingData,
+      status: 'completed',
+      progress: 100,
+      imageUrl: result.image_url || '',
+      updatedAt: new Date().toISOString()
+    };
     
-    await setDoc(taskRef, updatedData);
-    taskStatusCache.set(taskId, updatedData);
+    await setDoc(taskRef, completedData);
+    taskStatusCache.set(taskId, completedData);
 
-    setTimeout(async () => {
-      const completedData = {
-        ...updatedData,
-        status: 'completed',
-        progress: 100,
-        imageUrl: `https://storage.googleapis.com/generated-images/${taskId}.png`,
-        updatedAt: new Date().toISOString()
-      };
-      
-      await setDoc(taskRef, completedData);
-      taskStatusCache.set(taskId, completedData);
-    }, 5000);
-  }, 2000);
+    return {
+      task_id: taskId,
+      status: 'completed',
+      progress: 100,
+      imageUrl: completedData.imageUrl
+    };
+  } catch (error) {
+    // Update with error status
+    const errorData = {
+      ...taskData,
+      status: 'failed',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      updatedAt: new Date().toISOString()
+    };
+    
+    await setDoc(taskRef, errorData);
+    taskStatusCache.set(taskId, errorData);
 
-  return {
-    task_id: taskId,
-    status: 'pending',
-    progress: 0
-  };
+    throw error;
+  }
 };
 
 export const getTaskStatus = (taskId: string) => {
