@@ -47,21 +47,21 @@ export default function useImageGeneration() {
     retryCountRef.current = 0;
 
     try {
-      const taskId = await generateImageTask(prompt, aspectRatio);
-      console.log('Received task ID:', taskId);
+      const generationResult = await generateImageTask(prompt, aspectRatio);
       
-      if (!validateTaskId(taskId)) {
-        console.error('Invalid task ID format:', taskId);
-        throw new Error("Invalid task ID received");
+      if (!generationResult?.task_id) {
+        throw new Error("Invalid response from image generation service");
       }
 
       setResult({
-        taskId,
-        status: "pending",
-        progress: 0
+        taskId: generationResult.task_id,
+        status: mapApiStatus(generationResult.status),
+        imageUrl: generationResult.image_url,
+        imageUrls: generationResult.image_urls,
+        progress: generationResult.progress
       });
       
-      pollForResult(taskId, prompt, aspectRatio, INITIAL_POLL_INTERVAL);
+      pollForResult(generationResult.task_id, prompt, aspectRatio, INITIAL_POLL_INTERVAL);
 
     } catch (error) {
       console.error("Error generating image:", error);
@@ -73,10 +73,6 @@ export default function useImageGeneration() {
       });
       setIsGenerating(false);
     }
-  };
-
-  const validateTaskId = (taskId: string): boolean => {
-    return typeof taskId === 'string' && taskId.trim().length > 0;
   };
 
   const pollForResult = async (
@@ -104,13 +100,13 @@ export default function useImageGeneration() {
       setResult({
         taskId,
         status: mapApiStatus(taskStatus.status),
-        imageUrl: taskStatus.imageUrl,
-        imageUrls: taskStatus.imageUrls,
-        progress: taskStatus.progress
+        imageUrl: taskStatus.output?.image_url,
+        imageUrls: taskStatus.output?.image_urls,
+        progress: taskStatus.output?.progress
       });
 
       if (taskStatus.status === "completed") {
-        await storeGeneration(prompt, aspectRatio, taskStatus.imageUrl, user.uid);
+        await storeGeneration(prompt, aspectRatio, taskStatus.output?.image_url, user.uid);
         toast({
           title: "Success",
           description: "Image generated successfully!",

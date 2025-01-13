@@ -1,70 +1,11 @@
-interface TaskOutput {
-  image_url: string;
-  image_urls?: string[];
-  progress?: number;
-}
-
-interface TaskResponse {
-  code: number;
-  data: {
-    task_id: string;
-    model: string;
-    task_type: string;
-    status: "Completed" | "Processing" | "Pending" | "Failed" | "Staged";
-    input: Record<string, any>;
-    output: TaskOutput;
-    error: {
-      code: number;
-      message: string;
-      detail: any;
-    };
-  };
-  message: string;
-}
-
-const TASK_QUEUE_NAME = "image_generation_tasks";
 const GOAPI_URL = "https://api.goapi.ai/api/v1/task";
 const API_KEY = "de4e2500f7d3d0f5c82921fe541b7463a8b740a1bdd1ec8938a977861ea35bf5";
 
-class TaskQueue {
-  private static instance: TaskQueue;
-  private queue: Map<string, any>;
-  private cache: Map<string, any>;
-
-  private constructor() {
-    this.queue = new Map();
-    this.cache = new Map();
-  }
-
-  public static getInstance(): TaskQueue {
-    if (!TaskQueue.instance) {
-      TaskQueue.instance = new TaskQueue();
-    }
-    return TaskQueue.instance;
-  }
-
-  public async enqueue(task: any): Promise<string> {
-    const taskId = crypto.randomUUID();
-    this.queue.set(taskId, task);
-    return taskId;
-  }
-
-  public async get(taskKey: string): Promise<any> {
-    return this.cache.get(taskKey) || null;
-  }
-
-  public async set(taskKey: string, value: any): Promise<void> {
-    this.cache.set(taskKey, value);
-  }
-}
-
-const taskQueue = TaskQueue.getInstance();
-
-async function generateImageWithAPI(prompt: string, aspectRatio: string) {
-  const headers = new Headers({
+export const generateImageTask = async (prompt: string, aspectRatio: string) => {
+  const headers = {
     "x-api-key": API_KEY,
     "Content-Type": "application/json"
-  });
+  };
 
   const body = JSON.stringify({
     model: "midjourney",
@@ -85,49 +26,43 @@ async function generateImageWithAPI(prompt: string, aspectRatio: string) {
     }
   });
 
-  const response = await fetch(GOAPI_URL, {
-    method: 'POST',
-    headers,
-    body
-  });
+  console.log('Sending API request to:', GOAPI_URL);
+  console.log('Request headers:', headers);
+  console.log('Request body:', body);
 
-  if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
-  }
+  try {
+    const response = await fetch(GOAPI_URL, {
+      method: 'POST',
+      headers,
+      body
+    });
 
-  return await response.json();
-}
-
-export const generateImageTask = async (prompt: string, aspectRatio: string): Promise<string> => {
-  // Check if task is already in queue
-  const taskKey = `${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`;
-  const existingTask = await taskQueue.get(taskKey);
-  if (existingTask) {
-    return existingTask.task_id;
-  }
-
-  // Generate image using API
-  const apiResponse = await generateImageWithAPI(prompt, aspectRatio);
-  
-  const task = {
-    prompt,
-    aspectRatio,
-    timestamp: Date.now(),
-    result: {
-      image_url: apiResponse.data.output.image_url,
-      image_urls: apiResponse.data.output.image_urls || [],
-      progress: apiResponse.data.output.progress || 0
+    console.log('API response status:', response.status);
+    
+    if (!response.ok) {
+      const errorResponse = await response.text();
+      console.error('API error response:', errorResponse);
+      throw new Error(`API request failed with status ${response.status}`);
     }
-  };
 
-  // Add task to queue and get the generated task ID
-  const taskId = await taskQueue.enqueue(task);
+    const data = await response.json();
+    console.log('API response data:', data);
+    
+    // Updated response handling based on actual API structure
+    if (!data?.data?.task_id) {
+      console.error('Invalid API response format:', data);
+      throw new Error('Invalid API response format');
+    }
 
-  // Cache the task ID
-  await taskQueue.set(taskKey, { 
-    task_id: taskId,
-    result: task.result
-  });
-
-  return taskId;
+    return {
+      task_id: data.data.task_id,
+      image_url: data.data.output?.image_url || '',
+      image_urls: data.data.output?.image_urls || [],
+      progress: data.data.output?.progress || 0,
+      status: data.data.status || 'pending'
+    };
+  } catch (error) {
+    console.error('Error in generateImageTask:', error);
+    throw error;
+  }
 };
