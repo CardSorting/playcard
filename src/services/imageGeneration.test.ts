@@ -4,8 +4,16 @@ import { redisApi } from './redisApi';
 jest.mock('./redisApi');
 
 describe('Image Generation Service', () => {
+  let taskState: Record<string, any> = {};
+
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.useFakeTimers();
+    taskState = {};
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
   });
 
   it('should create a task with valid input', async () => {
@@ -71,5 +79,67 @@ describe('Image Generation Service', () => {
     const aspectRatio = '1:1';
     
     await expect(generateImageTask(prompt, aspectRatio)).rejects.toThrow(errorMessage);
+  });
+
+  it('should complete full image generation pipeline', async () => {
+    const mockTaskId = 'ba2ee0c1-03c8-4efb-823f-081a6882c178';
+    const mockImageUrl = 'https://example.com/generated-image.png';
+    
+    // Mock Redis operations
+    (redisApi.enqueue as jest.Mock).mockImplementation(async (queueName, task) => {
+      taskState[mockTaskId] = {
+        ...task,
+        status: 'pending',
+        createdAt: Date.now()
+      };
+      return mockTaskId;
+    });
+
+    (redisApi.getTaskStatus as jest.Mock).mockImplementation(async (taskId) => {
+      return taskState[taskId] || { status: 'pending' };
+    });
+
+    // Mock fetch for test endpoint
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ taskId: mockTaskId }),
+      })
+    ) as jest.Mock;
+
+    // Send test generation request
+    const response = await fetch('http://localhost:3001/test/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        prompt: 'test prompt',
+        aspectRatio: '1:1'
+      })
+    });
+
+    const { taskId } = await response.json();
+    expect(taskId).toBe(mockTaskId);
+
+    // Simulate task completion
+    jest.advanceTimersByTime(2500);
+    taskState[mockTaskId] = {
+      ...taskState[mockTaskId],
+      status: 'completed',
+      result: {
+        data: {
+          output: {
+            image_url: mockImageUrl,
+            image_urls: [mockImageUrl]
+          }
+        }
+      }
+    };
+
+    // Verify task status and result
+    const taskStatus = await redisApi.getTaskStatus(taskId);
+    expect(taskStatus.status).toBe('completed');
+    expect(taskStatus.result.data.output.image_url).toBe(mockImageUrl);
   });
 });

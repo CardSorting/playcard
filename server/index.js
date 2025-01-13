@@ -36,6 +36,43 @@ const getTaskKey = (taskId) => `task:${taskId}`;
 const getTaskStatusKey = (taskId) => `task_status:${taskId}`;
 const getTaskQueueKey = (priority) => `task_queue:${priority}`;
 
+// Test endpoint for image generation
+app.post('/test/generate', async (req, res) => {
+  try {
+    const { prompt, aspectRatio } = req.body;
+    const taskId = uuidv4();
+    
+    // Simulate task processing
+    await redis.hset(getTaskKey(taskId), {
+      prompt,
+      aspectRatio,
+      status: 'pending',
+      createdAt: Date.now()
+    });
+
+    // Simulate task completion after 2 seconds
+    setTimeout(async () => {
+      await redis.hset(getTaskKey(taskId), {
+        status: 'completed',
+        result: JSON.stringify({
+          data: {
+            output: {
+              image_url: 'https://example.com/generated-image.png',
+              image_urls: ['https://example.com/generated-image.png']
+            }
+          }
+        }),
+        completedAt: Date.now()
+      });
+    }, 2000);
+
+    res.status(200).json({ taskId });
+  } catch (error) {
+    console.error('Test generation error:', error);
+    res.status(500).json({ error: 'Failed to create test task' });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
