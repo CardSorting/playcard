@@ -8,7 +8,7 @@ export default function Home() {
     name: "Charizard",
     type: "Fire" as PokemonType,
     image:
-      "https://images.unsplash.com/photo-1628968434441-d9c1c66dcde3?w=800&auto=format&fit=crop",
+      "https://avatarfiles.alphacoders.com/374/thumb-1920-374376.png",
   };
 
   return (
@@ -87,31 +87,56 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 bg-yellow-400">
+      <section className="py-32 bg-yellow-400">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold text-black mb-8">
-            Ready to Create Your Cards?
-          </h2>
-          <p className="text-xl text-gray-800 mb-8 max-w-2xl mx-auto">
-            Join thousands of Pokemon fans who are already creating their own
-            unique cards.
-          </p>
-          <Button
-            asChild
-            size="lg"
-            className="bg-black text-white hover:bg-gray-900"
-          >
-            <Link to="/login">Start Creating Now</Link>
-          </Button>
-          <div className="mt-8">
-            <script async
-              src="https://js.stripe.com/v3/buy-button.js">
-            </script>
-            <stripe-buy-button
-              buy-button-id="buy_btn_1QgcqNIA2zQnWbn5qOgMN0Kn"
-              publishable-key="pk_live_51QUxquIA2zQnWbn5txySqbpjig5QCKtDGaFMZNqLOD1YTqSB4E40XKWWghNFY8mgjsHmiz5R4EFIfYkRSn7JmIxf00Dtpx1IRS"
-            >
-            </stripe-buy-button>
+          <div className="bg-black/5 p-8 rounded-3xl">
+            <h2 className="text-5xl font-bold text-black mb-6">
+              Create Your Dream Pokémon Cards Today!
+            </h2>
+            <p className="text-xl text-gray-800 mb-8 max-w-2xl mx-auto">
+              Join over <span className="font-semibold">15,000+</span> Pokémon fans who've created <span className="font-semibold">100,000+</span> unique cards
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button
+                asChild
+                size="lg"
+                className="bg-black text-white hover:bg-gray-900 px-8 py-6 text-lg font-semibold"
+              >
+                <Link to="/login">Start Creating - It's Free</Link>
+              </Button>
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="text-black border-black hover:bg-black/10 px-8 py-6 text-lg font-semibold"
+              >
+                <Link to="/pricing">See Pricing Plans</Link>
+              </Button>
+            </div>
+
+            <div className="mt-12">
+              <div className="text-sm text-gray-700 mb-4">
+                Trusted by Pokémon fans worldwide:
+              </div>
+              <div className="flex flex-wrap gap-6 justify-center items-center">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/39/Pokeball.PNG" alt="Pokeball" className="h-8 opacity-80" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/39/Pokeball.PNG" alt="Pokeball" className="h-8 opacity-80" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/39/Pokeball.PNG" alt="Pokeball" className="h-8 opacity-80" />
+                <img src="https://upload.wikimedia.org/wikipedia/commons/3/39/Pokeball.PNG" alt="Pokeball" className="h-8 opacity-80" />
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <script async
+                src="https://js.stripe.com/v3/buy-button.js">
+              </script>
+              <stripe-buy-button
+                buy-button-id="buy_btn_1QgcqNIA2zQnWbn5qOgMN0Kn"
+                publishable-key="pk_live_51QUxquIA2zQnWbn5txySqbpjig5QCKtDGaFMZNqLOD1YTqSB4E40XKWWghNFY8mgjsHmiz5R4EFIfYkRSn7JmIxf00Dtpx1IRS"
+              >
+              </stripe-buy-button>
+            </div>
           </div>
         </div>
       </section>
