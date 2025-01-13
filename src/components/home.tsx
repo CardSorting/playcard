@@ -103,6 +103,16 @@ export default function Home() {
           >
             <Link to="/login">Start Creating Now</Link>
           </Button>
+          <div className="mt-8">
+            <script async
+              src="https://js.stripe.com/v3/buy-button.js">
+            </script>
+            <stripe-buy-button
+              buy-button-id="buy_btn_1QgcqNIA2zQnWbn5qOgMN0Kn"
+              publishable-key="pk_live_51QUxquIA2zQnWbn5txySqbpjig5QCKtDGaFMZNqLOD1YTqSB4E40XKWWghNFY8mgjsHmiz5R4EFIfYkRSn7JmIxf00Dtpx1IRS"
+            >
+            </stripe-buy-button>
+          </div>
         </div>
       </section>
 

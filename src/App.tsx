@@ -11,6 +11,7 @@ import Marketplace from './components/marketplace';
 import Claims from './components/claims';
 import CardCreator from './components/card-creator';
 import Login from './components/auth/login';
+import Pricing from './components/pricing';
 import { Toaster } from './components/ui/toaster';
 
 // Route wrappers
@@ -81,6 +82,7 @@ function App() {
             </PublicRoute>
           } />
           <Route path="/" element={<Home />} />
+          <Route path="/pricing" element={<Pricing />} />
           <Route path="/booster-packs" element={
             <FirebaseInitializer>
               <ProtectedRoute>

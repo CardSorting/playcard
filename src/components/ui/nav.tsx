@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Home, Package, Library, Image, Sparkles, LogOut, Wand2 } from "lucide-react";
+import { Home, Package, Library, Image, Sparkles, LogOut, Wand2, CreditCard } from "lucide-react";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { auth } from "@/lib/firebase";
 import { Button } from "./button";
@@ -24,6 +24,10 @@ export default function Nav() {
               <Link to="/" className={linkClass}>
                 <Home className="w-5 h-5" />
                 <span>Home</span>
+              </Link>
+              <Link to="/pricing" className={linkClass}>
+                <CreditCard className="w-5 h-5" />
+                <span>Pricing</span>
               </Link>
               {user && (
                 <>
