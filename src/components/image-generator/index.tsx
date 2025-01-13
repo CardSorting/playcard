@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import useImageGeneration from "@/hooks/useImageGeneration";
 import { useAuth } from "@/lib/contexts/auth-context";
@@ -15,6 +15,15 @@ export default function ImageGenerator() {
   const { user } = useAuth();
   const [previousGenerations, setPreviousGenerations] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Simulate initial data loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, []);
 
   if (isLoading) {
     return (
