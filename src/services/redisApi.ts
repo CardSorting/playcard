@@ -24,7 +24,7 @@ export const redisApi = {
   },
 
   async enqueue(queueName: string, value: any): Promise<void> {
-    await fetch(`${API_BASE_URL}/redis/enqueue`, {
+    await fetch(`${API_BASE_URL}/redis/xadd`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -34,8 +34,8 @@ export const redisApi = {
   },
 
   async dequeue(queueName: string): Promise<any> {
-    const response = await fetch(`${API_BASE_URL}/redis/dequeue/${queueName}`);
-    const data = await response.json();
-    return data.value;
+      const response = await fetch(`${API_BASE_URL}/redis/xread/${queueName}`);
+      const data = await response.json();
+      return data.value;
   },
 };

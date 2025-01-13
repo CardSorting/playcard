@@ -85,14 +85,64 @@ app.get('/redis/dequeue/:queueName', async (req, res) => {
   }
 });
 
-// Task processing endpoint
-app.post('/process-task', async (req, res) => {
+app.post('/redis/xadd', async (req, res) => {
   try {
-    const task = await redis.lpop('image_generation_tasks');
-    if (!task) {
-      return res.status(200).json({ message: 'No tasks in queue' });
+    const { queueName, value } = req.body;
+    await redis.xadd(queueName, '*', JSON.stringify(value));
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Redis xadd error:', error);
+    res.status(500).json({ error: 'Failed to add to stream' });
+  }
+});
+
+app.get('/redis/xread/:queueName', async (req, res) => {
+    try {
+      const { queueName } = req.params;
+      const streamData = await redis.xread('COUNT', 1, 'STREAMS', queueName, '>');
+      if (!streamData || streamData.length === 0 || streamData[0][1].length === 0) {
+        return res.status(200).json({ value: null });
+      }
+      const value = streamData[0][1][0][1];
+      res.status(200).json({ value: value ? JSON.parse(value) : null });
+    } catch (error) {
+      console.error('Redis xread error:', error);
+      res.status(500).json({ error: 'Failed to read from stream' });
+    }
+  });
+
+const RATE_LIMIT_WINDOW = 60; // 1 minute
+const RATE_LIMIT_MAX = 5; // 5 requests per minute
+
+const rateLimit = async (req, res, next) => {
+  const userId = req.headers['user-id'] || 'anonymous'; // Or extract user ID from JWT
+  const key = `rate_limit:${userId}`;
+
+  try {
+    const tokens = await redis.get(key);
+    let currentTokens = tokens ? parseInt(tokens, 10) : RATE_LIMIT_MAX;
+
+    if (currentTokens <= 0) {
+      return res.status(429).json({ error: 'Too many requests' });
     }
 
+    currentTokens--;
+    await redis.set(key, currentTokens, 'EX', RATE_LIMIT_WINDOW);
+    next();
+  } catch (error) {
+    console.error('Rate limiting error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+// Task processing endpoint
+app.post('/process-task', rateLimit, async (req, res) => {
+  try {
+    const streamData = await redis.xread('COUNT', 1, 'STREAMS', 'image_generation_tasks', '>');
+    if (!streamData || streamData.length === 0 || streamData[0][1].length === 0) {
+      return res.status(200).json({ message: 'No tasks in queue' });
+    }
+    const task = streamData[0][1][0][1];
     const parsedTask = JSON.parse(task);
     const { prompt, aspectRatio } = parsedTask;
 
