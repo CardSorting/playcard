@@ -76,7 +76,6 @@ export default function useImageGeneration() {
   };
 
   const validateTaskId = (taskId: string): boolean => {
-    // More lenient validation - just check if it's a non-empty string
     return typeof taskId === 'string' && taskId.trim().length > 0;
   };
 
@@ -96,45 +95,34 @@ export default function useImageGeneration() {
       if (!response.ok) {
         throw new Error(`Failed to fetch task status: ${response.statusText}`);
       }
-      const responseData = await response.json();
-      if (!responseData?.currentStatus) {
-          throw new Error("Invalid response from task status API");
-      }
-      const taskStatus = responseData;
-      const mappedStatus = mapApiStatus(taskStatus.currentStatus);
+      const taskStatus = await response.json();
       
-      if (mappedStatus === "completed") {
-        if (!taskStatus.result) {
-          throw new Error("Completed task missing image URLs");
-        }
-        
-        const resultData = JSON.parse(taskStatus.result);
-        const imageUrls = resultData.data.output?.image_urls || [];
-        setResult({
-          taskId,
-          status: "completed",
-          imageUrl: imageUrls[0],
-          imageUrls,
-          progress: 100
-        });
-        await storeGeneration(prompt, aspectRatio, imageUrls[0], user.uid);
+      if (!taskStatus) {
+        throw new Error("Invalid response from task status API");
+      }
+
+      setResult({
+        taskId,
+        status: mapApiStatus(taskStatus.status),
+        imageUrl: taskStatus.imageUrl,
+        imageUrls: taskStatus.imageUrls,
+        progress: taskStatus.progress
+      });
+
+      if (taskStatus.status === "completed") {
+        await storeGeneration(prompt, aspectRatio, taskStatus.imageUrl, user.uid);
         toast({
           title: "Success",
           description: "Image generated successfully!",
         });
         cleanupPolling();
         setIsGenerating(false);
-      } else if (mappedStatus === "pending") {
-        setResult({
-          taskId,
-          status: "pending",
-          progress: taskStatus.progress || 0
-        });
+      } else if (taskStatus.status === "pending") {
         scheduleNextPoll(taskId, prompt, aspectRatio, interval);
       } else {
         throw new Error(
           taskStatus.error || 
-          `Task failed with status: ${taskStatus.currentStatus}`
+          `Task failed with status: ${taskStatus.status}`
         );
       }
     } catch (error) {
