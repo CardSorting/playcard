@@ -17,6 +17,7 @@ import axios from "axios";
 import { useAuth } from "@/lib/contexts/auth-context";
 import { db } from "@/lib/firebase";
 import { collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface GenerationResult {
   taskId: string;
@@ -40,12 +41,15 @@ export default function ImageGenerator() {
   const [result, setResult] = useState<GenerationResult | null>(null);
   const [previousGenerations, setPreviousGenerations] = useState<StoredGeneration[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
 
   useEffect(() => {
     if (user) {
       loadPreviousGenerations();
+    } else {
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -75,6 +79,8 @@ export default function ImageGenerator() {
         description: "Failed to load previous generations",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -91,7 +97,7 @@ export default function ImageGenerator() {
         createdAt: new Date()
       });
 
-      await loadPreviousGenerations(); // Refresh the list
+      await loadPreviousGenerations();
     } catch (error) {
       console.error("Error storing generation:", error);
       toast({
@@ -145,7 +151,6 @@ export default function ImageGenerator() {
         imageUrl,
       });
 
-      // Store the generation in Firestore
       await storeGeneration(imageUrl);
 
       toast({
@@ -164,6 +169,42 @@ export default function ImageGenerator() {
       setIsGenerating(false);
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+        <div className="max-w-7xl mx-auto pt-20 px-4 sm:px-6 lg:px-8 pb-24">
+          <div className="text-center mb-12">
+            <Skeleton className="h-12 w-[400px] mx-auto mb-4" />
+            <Skeleton className="h-4 w-[600px] mx-auto" />
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-8">
+              <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-[100px]" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                  <Skeleton className="h-[200px] w-full" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-[100px]" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              </Card>
+            </div>
+
+            <Card className="p-6 bg-white/10 backdrop-blur-sm border-gray-800">
+              <Skeleton className="h-[500px] w-full" />
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
@@ -196,7 +237,6 @@ export default function ImageGenerator() {
 
                 <ExamplePrompts onSelectExample={(prompt) => setPrompt(prompt)} />
                 
-
                 <div className="space-y-2">
                   <Label>Aspect Ratio</Label>
                   <Select value={aspectRatio} onValueChange={setAspectRatio}>
