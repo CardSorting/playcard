@@ -1,4 +1,5 @@
-export interface Task {
+// Client-facing task interface
+export interface ClientTask {
   id: string;
   prompt: string;
   aspectRatio: string;
@@ -8,6 +9,14 @@ export interface Task {
   createdAt: number;
   updatedAt: number;
   imageUrls?: ImageUrls;
+}
+
+// Admin-only task interface (extends client interface)
+export interface AdminTask extends ClientTask {
+  userId: string;
+  authToken?: string;
+  internalStatus?: string;
+  retryCount?: number;
 }
 
 export interface ImageUrls {
@@ -38,7 +47,7 @@ export interface TaskCreationParams {
 }
 
 export interface TaskUpdateParams {
-  status?: Task['status'];
+  status?: AdminTask['status'];
   progress?: number;
   imageUrls?: ImageUrls;
   error?: string;

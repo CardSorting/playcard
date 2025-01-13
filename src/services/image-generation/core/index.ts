@@ -1,21 +1,25 @@
 import { v4 as uuidv4 } from 'uuid';
 import { auth } from '@/lib/firebase';
 import { User } from 'firebase/auth';
-import { Task, TaskCreationParams } from '../types';
-import { FirebaseImageService } from '../firebase';
+import { ClientTask, TaskCreationParams } from '../types';
 import { ImageApiService } from '../api';
+
+interface TaskService {
+  createTask: (userId: string, taskData: any) => Promise<any>;
+  getTaskStatus: (taskId: string, userId: string) => Promise<any>;
+}
 
 export class ImageGenerationCoreService {
   constructor(
-    private firebaseService: FirebaseImageService,
-    private apiService: ImageApiService
+    private apiService: ImageApiService,
+    private taskService: TaskService
   ) {}
 
   async generateTask(params: TaskCreationParams) {
     const user = await this.getCurrentUser();
     const taskId = uuidv4();
     
-    const taskData: Task = {
+    const taskData: ClientTask = {
       id: taskId,
       ...params,
       status: 'pending',
@@ -24,24 +28,24 @@ export class ImageGenerationCoreService {
       updatedAt: Date.now()
     };
 
-    const taskRef = await this.firebaseService.createTask(user.uid, taskData);
+    // Create task via HTTP API
+    await this.taskService.createTask(user.uid, taskData);
 
     try {
-      await this.firebaseService.updateTask(taskRef, {
-        status: 'processing',
-        progress: 0
-      });
-
+      // Start image generation
       const taskResponse = await this.apiService.createTask(
         params.prompt,
         params.aspectRatio,
         params.processMode
       );
 
+      // Poll for status updates
       await this.apiService.pollTaskStatus(
         taskResponse.task_id,
         async (status) => {
-          await this.firebaseService.updateTask(taskRef, {
+          // Update task status via HTTP API
+          await this.taskService.createTask(user.uid, {
+            ...taskData,
             status: status.status as 'pending' | 'processing' | 'completed' | 'failed',
             progress: status.output?.progress || 0
           });
@@ -54,7 +58,9 @@ export class ImageGenerationCoreService {
         progress: 100
       };
     } catch (error) {
-      await this.firebaseService.updateTask(taskRef, {
+      // Update task status to failed via HTTP API
+      await this.taskService.createTask(user.uid, {
+        ...taskData,
         status: 'failed',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
