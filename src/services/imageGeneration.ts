@@ -1,5 +1,3 @@
-import { redisApi } from "./redisApi";
-
 interface TaskOutput {
   image_url: string;
   image_urls?: string[];
@@ -24,12 +22,46 @@ interface TaskResponse {
   message: string;
 }
 
-const TASK_CACHE_TTL = 60 * 60; // 1 hour
 const TASK_QUEUE_NAME = "image_generation_tasks";
+
+class TaskQueue {
+  private static instance: TaskQueue;
+  private queue: Map<string, any>;
+  private cache: Map<string, any>;
+
+  private constructor() {
+    this.queue = new Map();
+    this.cache = new Map();
+  }
+
+  public static getInstance(): TaskQueue {
+    if (!TaskQueue.instance) {
+      TaskQueue.instance = new TaskQueue();
+    }
+    return TaskQueue.instance;
+  }
+
+  public async enqueue(task: any): Promise<string> {
+    const taskId = crypto.randomUUID();
+    this.queue.set(taskId, task);
+    return taskId;
+  }
+
+  public async get(taskKey: string): Promise<any> {
+    return this.cache.get(taskKey) || null;
+  }
+
+  public async set(taskKey: string, value: any): Promise<void> {
+    this.cache.set(taskKey, value);
+  }
+}
+
+const taskQueue = TaskQueue.getInstance();
 
 export const generateImageTask = async (prompt: string, aspectRatio: string): Promise<string> => {
   // Check if task is already in queue
-  const existingTask = await redisApi.get(`${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`);
+  const taskKey = `${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`;
+  const existingTask = await taskQueue.get(taskKey);
   if (existingTask) {
     return existingTask.task_id;
   }
@@ -41,14 +73,10 @@ export const generateImageTask = async (prompt: string, aspectRatio: string): Pr
   };
 
   // Add task to queue and get the generated task ID
-  const taskId = await redisApi.enqueue(TASK_QUEUE_NAME, task);
+  const taskId = await taskQueue.enqueue(task);
 
   // Cache the task ID
-  await redisApi.set(
-    `${TASK_QUEUE_NAME}:${prompt}:${aspectRatio}`,
-    { task_id: taskId },
-    TASK_CACHE_TTL
-  );
+  await taskQueue.set(taskKey, { task_id: taskId });
 
   return taskId;
 };

@@ -1,6 +1,5 @@
 import { collection, addDoc, query, where, orderBy, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { redisApi } from "./redisApi";
 
 export interface StoredGeneration {
   id: string;
@@ -11,7 +10,33 @@ export interface StoredGeneration {
   createdAt: Date;
 }
 
-const GENERATION_CACHE_TTL = 24 * 60 * 60; // 24 hours
+const GENERATION_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const memoryCache = new Map<string, { value: any, timeout: NodeJS.Timeout }>();
+
+const memoryStorage = {
+  set: (key: string, value: any, ttl?: number): void => {
+    // Clear existing timeout if present
+    if (memoryCache.has(key)) {
+      clearTimeout(memoryCache.get(key)!.timeout);
+    }
+
+    // Set new value with timeout
+    const timeout = ttl ? setTimeout(() => memoryCache.delete(key), ttl) : null;
+    memoryCache.set(key, { value, timeout });
+  },
+
+  get: (key: string): any => {
+    if (!memoryCache.has(key)) return null;
+    return memoryCache.get(key)!.value;
+  },
+
+  delete: (key: string): void => {
+    if (memoryCache.has(key)) {
+      clearTimeout(memoryCache.get(key)!.timeout);
+      memoryCache.delete(key);
+    }
+  }
+};
 
 export const storeGeneration = async (
   prompt: string,
@@ -32,8 +57,8 @@ export const storeGeneration = async (
     // Store in Firestore
     const docRef = await addDoc(generationsRef, generationData);
     
-    // Cache in Redis
-    await redisApi.set(
+    // Cache in memory
+    memoryStorage.set(
       `generation:${userId}:${docRef.id}`,
       { ...generationData, id: docRef.id },
       GENERATION_CACHE_TTL
@@ -46,8 +71,8 @@ export const storeGeneration = async (
 
 export const loadPreviousGenerations = async (userId: string): Promise<StoredGeneration[]> => {
   try {
-    // Try to get from Redis cache first
-    const cachedGenerations = await redisApi.get(`generations:${userId}`);
+    // Try to get from memory cache first
+    const cachedGenerations = memoryStorage.get(`generations:${userId}`);
     if (cachedGenerations) {
       return cachedGenerations;
     }
@@ -67,8 +92,8 @@ export const loadPreviousGenerations = async (userId: string): Promise<StoredGen
       createdAt: doc.data().createdAt.toDate()
     })) as StoredGeneration[];
 
-    // Cache results in Redis
-    await redisApi.set(
+    // Cache results in memory
+    memoryStorage.set(
       `generations:${userId}`,
       generations,
       GENERATION_CACHE_TTL
